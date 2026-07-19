@@ -1,0 +1,95 @@
+name: Build & Deploy to Production Branch
+
+on:
+  push:
+    branches: [main]
+  workflow_dispatch:
+
+permissions:
+  contents: write
+
+jobs:
+  build-and-deploy:
+    runs-on: ubuntu-latest
+
+    steps:
+      - name: Checkout main
+        uses: actions/checkout@v4
+        with:
+          ref: main
+
+      - name: Setup Node.js
+        uses: actions/setup-node@v4
+        with:
+          node-version: "20"
+          cache: "npm"
+
+      - name: Install dependencies
+        run: npm ci
+
+      - name: TypeScript compile
+        run: npx tsc
+
+      - name: Prune dev dependencies
+        run: npm prune --production
+
+      - name: Prepare production artifact
+        run: |
+          mkdir -p _deploy
+          # Compiled JS + declarations
+          cp -r dist/ _deploy/dist/
+          # Production node_modules
+          cp -r node_modules/ _deploy/node_modules/
+          # Package files
+          cp package.json package-lock.json _deploy/
+          # Runner scripts
+          mkdir -p _deploy/scripts
+          cp scripts/update-checker.js _deploy/scripts/
+          cp scripts/prod-start.sh _deploy/scripts/
+          chmod +x _deploy/scripts/prod-start.sh
+          # PM2 ecosystem
+          mkdir -p _deploy/ecosystem
+          cp ecosystem/ecosystem.config.js _deploy/ecosystem/
+
+      - name: Ensure production branch exists
+        run: |
+          if ! git ls-remote --heads origin _pm2_prod_run | grep -q _pm2_prod_run; then
+            echo "Creating _pm2_prod_run branch..."
+            TMP=$(mktemp -d)
+            cd "$TMP"
+            git init
+            git commit --allow-empty -m "init: empty production branch"
+            git remote add origin "${{ github.server_url }}/${{ github.repository }}.git"
+            git push origin HEAD:_pm2_prod_run
+            cd -
+          fi
+
+      - name: Checkout production branch
+        uses: actions/checkout@v4
+        with:
+          ref: _pm2_prod_run
+          path: _prod
+          fetch-depth: 0
+
+      - name: Deploy to production branch
+        run: |
+          cd _prod
+
+          # Clear old files (keep .git)
+          find . -maxdepth 1 ! -name '.git' ! -name '.' -exec rm -rf {} +
+
+          # Copy build artifacts
+          cp -r ../_deploy/* .
+
+          # Commit
+          git config user.name "github-actions[bot]"
+          git config user.email "github-actions[bot]@users.noreply.github.com"
+          git add -A
+          # Only commit if there are changes
+          if git diff --cached --quiet; then
+            echo "No changes to commit"
+          else
+            SHORT_SHA=$(git -C ../.. rev-parse --short HEAD)
+            git commit -m "build: deploy ${SHORT_SHA} from main"
+            git push origin _pm2_prod_run
+          fi
