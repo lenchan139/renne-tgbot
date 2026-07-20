@@ -31,9 +31,6 @@ jobs:
       - name: TypeScript compile
         run: npx tsc
 
-      - name: Prune dev dependencies
-        run: npm prune --production
-
       - name: Prepare production artifact
         run: |
           mkdir -p _deploy
