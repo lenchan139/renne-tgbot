@@ -1,0 +1,1 @@
+{"version":3,"file":"zipper.d.ts","sourceRoot":"","sources":["../../src/modules/zipper.ts"],"names":[],"mappings":"AAEA,OAAO,EAAE,eAAe,EAAE,MAAM,mBAAmB,CAAC;AAEpD,MAAM,WAAW,SAAS;IACxB,OAAO,EAAE,MAAM,CAAC;IAChB,OAAO,EAAE,MAAM,CAAC;CACjB;AAED;;GAEG;AACH,wBAAgB,YAAY,CAC1B,OAAO,EAAE,MAAM,EACf,UAAU,EAAE,MAAM,EAClB,QAAQ,CAAC,EAAE,eAAe,GACzB,OAAO,CAAC,SAAS,CAAC,CA4BpB"}
