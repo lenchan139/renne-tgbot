@@ -1,5 +1,5 @@
-const WebTorrent = require('webtorrent');
-const parseTorrent = require('parse-torrent');
+import WebTorrent from 'webtorrent';
+import parseTorrent from 'parse-torrent';
 import * as fs from 'fs';
 import * as path from 'path';
 import { ProgressTracker } from '../utils/progress.js';
