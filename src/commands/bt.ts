@@ -1,5 +1,5 @@
 import { Context } from 'grammy';
-import { extractMagnet } from '../utils/tg';
+import { extractMagnet } from '../utils/tg.js';
 
 /**
  * /bt command — ask user to send torrent file or magnet link

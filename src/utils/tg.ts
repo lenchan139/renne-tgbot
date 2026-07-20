@@ -1,7 +1,7 @@
 import { Context } from 'grammy';
 import * as path from 'path';
 import * as fs from 'fs';
-import { TMP_DIR } from './constants';
+import { TMP_DIR } from './constants.js';
 
 /** Ensure tmp directory exists */
 export function ensureTmpDir(): string {
