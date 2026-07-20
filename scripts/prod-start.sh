@@ -74,7 +74,7 @@ pm2 delete renne-updater 2>/dev/null || true
 
 # ── Start processes ───────────────────────────────────────────
 echo "🚀 Starting Renne Bot..."
-pm2 start ecosystem/ecosystem.config.js
+pm2 start ecosystem/ecosystem.config.cjs
 
 # ── Save pm2 process list & setup startup ─────────────────────
 pm2 save
