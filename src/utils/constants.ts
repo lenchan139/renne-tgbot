@@ -12,6 +12,20 @@ export const TMP_DIR = '/tmp/renne-bot';
 export const X_DOMAINS = ['x.com', 'twitter.com'];
 export const X_FIXUP_DOMAIN = 'fixupx.com';
 
+/**
+ * Platform download domains — used in url.ts routing.
+ * Each entry maps the display name to the URL pattern prefix.
+ */
+export const PLATFORM_CONFIGS: Record<string, { domains: string[]; name: string }> = {
+  threads: { domains: ['threads.net'], name: 'Threads' },
+  xiaohongshu: { domains: ['xhslink.com', 'xiaohongshu.com'], name: '小红书' },
+  douyin: { domains: ['v.douyin.com', 'douyin.com'], name: '抖音' },
+  tiktok: { domains: ['vt.tiktok.com', 'tiktok.com', 'vm.tiktok.com'], name: 'TikTok' },
+  weibo: { domains: ['weibo.com', 'm.weibo.cn', 'weibo.cn'], name: '微博' },
+  bilibili: { domains: ['bilibili.com', 'b23.tv'], name: 'Bilibili' },
+  wechat: { domains: ['mp.weixin.qq.com'], name: '微信公众号' },
+};
+
 /** Supported file extensions */
 export const IMAGE_EXTENSIONS = ['.jpg', '.jpeg', '.png', '.webp', '.bmp', '.gif'];
 export const VIDEO_EXTENSIONS = ['.mp4', '.mkv', '.avi', '.mov', '.webm', '.flv', '.wmv', '.m4v'];
