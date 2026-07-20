@@ -41,7 +41,7 @@ jobs:
           cp -r node_modules/ _deploy/node_modules/
           cp package.json package-lock.json _deploy/
           mkdir -p _deploy/scripts
-          cp scripts/update-checker.cjs _deploy/scripts/
+          cp scripts/prod-start.sh scripts/update-checker.cjs _deploy/scripts/
           chmod +x _deploy/scripts/prod-start.sh
           mkdir -p _deploy/ecosystem
           cp ecosystem/ecosystem.config.cjs _deploy/ecosystem/
