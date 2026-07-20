@@ -1,10 +1,7 @@
-"use strict";
-Object.defineProperty(exports, "__esModule", { value: true });
-exports.btCommand = btCommand;
 /**
  * /bt command — ask user to send torrent file or magnet link
  */
-async function btCommand(ctx) {
+export async function btCommand(ctx) {
     await ctx.reply(`📥 **Send me a torrent file or magnet link**
 
 • Send a \`.torrent\` file

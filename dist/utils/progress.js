@@ -1,11 +1,8 @@
-"use strict";
-Object.defineProperty(exports, "__esModule", { value: true });
-exports.createProgress = createProgress;
 /**
  * Creates a progress message and returns a tracker.
  * The tracker's update() method edits the message in-place.
  */
-async function createProgress(ctx, initialText) {
+export async function createProgress(ctx, initialText) {
     const chatId = ctx.chat.id;
     const msg = await ctx.reply(initialText);
     const messageId = msg.message_id;

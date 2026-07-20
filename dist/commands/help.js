@@ -1,7 +1,4 @@
-"use strict";
-Object.defineProperty(exports, "__esModule", { value: true });
-exports.helpCommand = helpCommand;
-async function helpCommand(ctx) {
+export async function helpCommand(ctx) {
     const text = `📖 **Command List**
 
 **Torrent**

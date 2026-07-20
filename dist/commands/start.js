@@ -1,7 +1,4 @@
-"use strict";
-Object.defineProperty(exports, "__esModule", { value: true });
-exports.startCommand = startCommand;
-async function startCommand(ctx) {
+export async function startCommand(ctx) {
     const text = `👋 **Hi! I'm Renne Bot**
 
 I can help you with:

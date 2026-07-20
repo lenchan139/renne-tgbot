@@ -1,24 +1,12 @@
-"use strict";
-var __importDefault = (this && this.__importDefault) || function (mod) {
-    return (mod && mod.__esModule) ? mod : { "default": mod };
-};
-Object.defineProperty(exports, "__esModule", { value: true });
-exports.compressImage = compressImage;
-exports.uncompressedImage = uncompressedImage;
-exports.videoToGif = videoToGif;
-exports.gifToVideo = gifToVideo;
-exports.gifToImage = gifToImage;
-exports.getMediaInfo = getMediaInfo;
-exports.canSendViaBot = canSendViaBot;
-const sharp_1 = __importDefault(require("sharp"));
-const fluent_ffmpeg_1 = __importDefault(require("fluent-ffmpeg"));
-const tg_1 = require("../utils/tg");
+import sharp from 'sharp';
+import ffmpeg from 'fluent-ffmpeg';
+import { tempFilePath } from '../utils/tg.js';
 /**
- * Compress an image to ~50% quality, returning new file path
+ * Compress an image to ~60% quality
  */
-async function compressImage(inputPath) {
-    const outputPath = (0, tg_1.tempFilePath)('compressed.jpg');
-    await (0, sharp_1.default)(inputPath)
+export async function compressImage(inputPath) {
+    const outputPath = tempFilePath('compressed.jpg');
+    await sharp(inputPath)
         .resize({ width: 1920, withoutEnlargement: true })
         .jpeg({ quality: 60 })
         .toFile(outputPath);
@@ -27,9 +15,9 @@ async function compressImage(inputPath) {
 /**
  * Convert image to PNG (uncompressed)
  */
-async function uncompressedImage(inputPath) {
-    const outputPath = (0, tg_1.tempFilePath)(`original.png`);
-    await (0, sharp_1.default)(inputPath)
+export async function uncompressedImage(inputPath) {
+    const outputPath = tempFilePath('original.png');
+    await sharp(inputPath)
         .png()
         .toFile(outputPath);
     return outputPath;
@@ -37,10 +25,10 @@ async function uncompressedImage(inputPath) {
 /**
  * Convert video to GIF using ffmpeg
  */
-async function videoToGif(inputPath, onProgress) {
-    const outputPath = (0, tg_1.tempFilePath)('output.gif');
+export async function videoToGif(inputPath, onProgress) {
+    const outputPath = tempFilePath('output.gif');
     return new Promise((resolve, reject) => {
-        const cmd = (0, fluent_ffmpeg_1.default)(inputPath)
+        const cmd = ffmpeg(inputPath)
             .outputOptions([
             '-vf', 'fps=10,scale=480:-1:flags=lanczos,split[s0][s1];[s0]palettegen[p];[s1][p]paletteuse',
             '-loop', '0',
@@ -58,10 +46,10 @@ async function videoToGif(inputPath, onProgress) {
 /**
  * Convert GIF to video
  */
-async function gifToVideo(inputPath) {
-    const outputPath = (0, tg_1.tempFilePath)('output.mp4');
+export async function gifToVideo(inputPath) {
+    const outputPath = tempFilePath('output.mp4');
     return new Promise((resolve, reject) => {
-        (0, fluent_ffmpeg_1.default)(inputPath)
+        ffmpeg(inputPath)
             .outputOptions(['-movflags', '+faststart', '-pix_fmt', 'yuv420p'])
             .videoCodec('libx264')
             .output(outputPath)
@@ -73,10 +61,10 @@ async function gifToVideo(inputPath) {
 /**
  * Extract first frame of GIF/video as PNG
  */
-async function gifToImage(inputPath) {
-    const outputPath = (0, tg_1.tempFilePath)('frame.png');
+export async function gifToImage(inputPath) {
+    const outputPath = tempFilePath('frame.png');
     return new Promise((resolve, reject) => {
-        (0, fluent_ffmpeg_1.default)(inputPath)
+        ffmpeg(inputPath)
             .outputOptions(['-vframes', '1'])
             .output(outputPath)
             .on('end', () => resolve(outputPath))
@@ -87,9 +75,9 @@ async function gifToImage(inputPath) {
 /**
  * Get media info (duration, dimensions, etc.)
  */
-function getMediaInfo(inputPath) {
+export function getMediaInfo(inputPath) {
     return new Promise((resolve, reject) => {
-        fluent_ffmpeg_1.default.ffprobe(inputPath, (err, metadata) => {
+        ffmpeg.ffprobe(inputPath, (err, metadata) => {
             if (err)
                 return reject(err);
             const video = metadata.streams.find((s) => s.codec_type === 'video');
@@ -104,7 +92,7 @@ function getMediaInfo(inputPath) {
 /**
  * Check if a video/image is small enough to send via Telegram bot API
  */
-function canSendViaBot(fileSize) {
+export function canSendViaBot(fileSize) {
     return fileSize <= 50 * 1024 * 1024; // 50 MB
 }
 //# sourceMappingURL=media.js.map

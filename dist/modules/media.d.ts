@@ -1,5 +1,5 @@
 /**
- * Compress an image to ~50% quality, returning new file path
+ * Compress an image to ~60% quality
  */
 export declare function compressImage(inputPath: string): Promise<string>;
 /**

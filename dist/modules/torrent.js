@@ -1,47 +1,8 @@
-"use strict";
-var __createBinding = (this && this.__createBinding) || (Object.create ? (function(o, m, k, k2) {
-    if (k2 === undefined) k2 = k;
-    var desc = Object.getOwnPropertyDescriptor(m, k);
-    if (!desc || ("get" in desc ? !m.__esModule : desc.writable || desc.configurable)) {
-      desc = { enumerable: true, get: function() { return m[k]; } };
-    }
-    Object.defineProperty(o, k2, desc);
-}) : (function(o, m, k, k2) {
-    if (k2 === undefined) k2 = k;
-    o[k2] = m[k];
-}));
-var __setModuleDefault = (this && this.__setModuleDefault) || (Object.create ? (function(o, v) {
-    Object.defineProperty(o, "default", { enumerable: true, value: v });
-}) : function(o, v) {
-    o["default"] = v;
-});
-var __importStar = (this && this.__importStar) || (function () {
-    var ownKeys = function(o) {
-        ownKeys = Object.getOwnPropertyNames || function (o) {
-            var ar = [];
-            for (var k in o) if (Object.prototype.hasOwnProperty.call(o, k)) ar[ar.length] = k;
-            return ar;
-        };
-        return ownKeys(o);
-    };
-    return function (mod) {
-        if (mod && mod.__esModule) return mod;
-        var result = {};
-        if (mod != null) for (var k = ownKeys(mod), i = 0; i < k.length; i++) if (k[i] !== "default") __createBinding(result, mod, k[i]);
-        __setModuleDefault(result, mod);
-        return result;
-    };
-})();
-Object.defineProperty(exports, "__esModule", { value: true });
-exports.crawlMagnet = crawlMagnet;
-exports.crawlTorrentBuffer = crawlTorrentBuffer;
-exports.downloadTorrent = downloadTorrent;
-exports.categorizeFiles = categorizeFiles;
 const WebTorrent = require('webtorrent');
 const parseTorrent = require('parse-torrent');
-const path = __importStar(require("path"));
-const constants_1 = require("../utils/constants");
-const tg_1 = require("../utils/tg");
+import * as path from 'path';
+import { isImageFile, isVideoFile, } from '../utils/constants.js';
+import { ensureTmpDir } from '../utils/tg.js';
 /**
  * Create a WebTorrent client (singleton per process)
  */
@@ -55,7 +16,7 @@ function getClient() {
 /**
  * Crawl torrent info from a magnet link
  */
-function crawlMagnet(magnetUri) {
+export function crawlMagnet(magnetUri) {
     return new Promise((resolve, reject) => {
         const wt = getClient();
         const torrent = wt.add(magnetUri, { destroyStoreOnDestroy: true });
@@ -85,7 +46,7 @@ function crawlMagnet(magnetUri) {
 /**
  * Crawl torrent info from a .torrent buffer
  */
-function crawlTorrentBuffer(buf) {
+export function crawlTorrentBuffer(buf) {
     return new Promise((resolve, reject) => {
         const parsed = parseTorrent(buf);
         if (!parsed.info) {
@@ -119,12 +80,12 @@ function crawlTorrentBuffer(buf) {
 /**
  * Download a torrent and return the download directory path.
  */
-function downloadTorrent(magnetOrTorrent, progress, onProgress) {
+export function downloadTorrent(magnetOrTorrent, progress, onProgress) {
     return new Promise((resolve, reject) => {
         const wt = getClient();
-        (0, tg_1.ensureTmpDir)();
+        ensureTmpDir();
         const torrent = wt.add(magnetOrTorrent, {
-            path: (0, tg_1.ensureTmpDir)(),
+            path: ensureTmpDir(),
             destroyStoreOnDestroy: true,
         });
         let updateInterval = null;
@@ -144,10 +105,10 @@ function downloadTorrent(magnetOrTorrent, progress, onProgress) {
                 clearInterval(updateInterval);
             if (progress)
                 progress.update('✅ Download complete, processing...');
-            const dirPath = path.join((0, tg_1.ensureTmpDir)(), torrent.name);
+            const dirPath = path.join(ensureTmpDir(), torrent.name);
             const files = torrent.files.map((f) => ({
                 name: f.name,
-                path: path.join((0, tg_1.ensureTmpDir)(), f.path),
+                path: path.join(ensureTmpDir(), f.path),
                 size: f.length,
             }));
             resolve({
@@ -171,14 +132,14 @@ function formatSpeed(bytesPerSec) {
     const i = Math.floor(Math.log(bytesPerSec) / Math.log(1024));
     return `${(bytesPerSec / Math.pow(1024, i)).toFixed(1)} ${units[i]}`;
 }
-function categorizeFiles(files) {
+export function categorizeFiles(files) {
     const images = [];
     const videos = [];
     const others = [];
     for (const f of files) {
-        if ((0, constants_1.isImageFile)(f.name))
+        if (isImageFile(f.name))
             images.push(f);
-        else if ((0, constants_1.isVideoFile)(f.name))
+        else if (isVideoFile(f.name))
             videos.push(f);
         else
             others.push(f);

@@ -1,47 +1,10 @@
-"use strict";
-var __createBinding = (this && this.__createBinding) || (Object.create ? (function(o, m, k, k2) {
-    if (k2 === undefined) k2 = k;
-    var desc = Object.getOwnPropertyDescriptor(m, k);
-    if (!desc || ("get" in desc ? !m.__esModule : desc.writable || desc.configurable)) {
-      desc = { enumerable: true, get: function() { return m[k]; } };
-    }
-    Object.defineProperty(o, k2, desc);
-}) : (function(o, m, k, k2) {
-    if (k2 === undefined) k2 = k;
-    o[k2] = m[k];
-}));
-var __setModuleDefault = (this && this.__setModuleDefault) || (Object.create ? (function(o, v) {
-    Object.defineProperty(o, "default", { enumerable: true, value: v });
-}) : function(o, v) {
-    o["default"] = v;
-});
-var __importStar = (this && this.__importStar) || (function () {
-    var ownKeys = function(o) {
-        ownKeys = Object.getOwnPropertyNames || function (o) {
-            var ar = [];
-            for (var k in o) if (Object.prototype.hasOwnProperty.call(o, k)) ar[ar.length] = k;
-            return ar;
-        };
-        return ownKeys(o);
-    };
-    return function (mod) {
-        if (mod && mod.__esModule) return mod;
-        var result = {};
-        if (mod != null) for (var k = ownKeys(mod), i = 0; i < k.length; i++) if (k[i] !== "default") __createBinding(result, mod, k[i]);
-        __setModuleDefault(result, mod);
-        return result;
-    };
-})();
-Object.defineProperty(exports, "__esModule", { value: true });
-exports.handleImage = handleImage;
-exports.handleImageAction = handleImageAction;
-const grammy_1 = require("grammy");
-const fs = __importStar(require("fs"));
-const tg_1 = require("../utils/tg");
+import { InputFile } from 'grammy';
+import * as fs from 'fs';
+import { tempFilePath, cleanupFile } from '../utils/tg.js';
 /**
  * Handle incoming image messages — ask user what to do
  */
-async function handleImage(ctx) {
+export async function handleImage(ctx) {
     const photo = ctx.message?.photo;
     if (!photo)
         return;
@@ -59,14 +22,14 @@ Reply with a number:
 /**
  * Handle image action selection (reply with 1, 2, or 3)
  */
-async function handleImageAction(ctx, action) {
+export async function handleImageAction(ctx, action) {
     const repliedMsg = ctx.message?.reply_to_message;
     if (!repliedMsg?.photo)
         return;
     const photo = repliedMsg.photo;
     const fileId = photo[photo.length - 1].file_id;
     const file = await ctx.api.getFile(fileId);
-    const filePath = (0, tg_1.tempFilePath)('input.jpg');
+    const filePath = tempFilePath('input.jpg');
     const fileUrl = `https://api.telegram.org/file/bot${process.env.BOT_TOKEN}/${file.file_path}`;
     const response = await fetch(fileUrl);
     const buffer = Buffer.from(await response.arrayBuffer());
@@ -74,16 +37,16 @@ async function handleImageAction(ctx, action) {
     try {
         switch (action) {
             case '1': {
-                const { videoToGif } = await Promise.resolve().then(() => __importStar(require('../modules/media.js')));
-                const { createProgress } = await Promise.resolve().then(() => __importStar(require('../utils/progress.js')));
+                const { videoToGif } = await import('../modules/media.js');
+                const { createProgress } = await import('../utils/progress.js');
                 const progress = await createProgress(ctx, '⏳ Converting image to GIF...');
                 try {
                     const gifPath = await videoToGif(filePath);
                     await progress.delete();
-                    await ctx.replyWithAnimation(new grammy_1.InputFile(gifPath), {
+                    await ctx.replyWithAnimation(new InputFile(gifPath), {
                         reply_parameters: { message_id: repliedMsg.message_id },
                     });
-                    (0, tg_1.cleanupFile)(gifPath);
+                    cleanupFile(gifPath);
                 }
                 catch (err) {
                     await progress.update('❌ Failed to convert to GIF.');
@@ -108,7 +71,7 @@ async function handleImageAction(ctx, action) {
         }
     }
     finally {
-        (0, tg_1.cleanupFile)(filePath);
+        cleanupFile(filePath);
     }
 }
 //# sourceMappingURL=image.js.map

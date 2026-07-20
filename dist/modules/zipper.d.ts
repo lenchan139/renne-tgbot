@@ -1,4 +1,4 @@
-import { ProgressTracker } from '../utils/progress';
+import { ProgressTracker } from '../utils/progress.js';
 export interface ZipResult {
     zipPath: string;
     zipSize: number;
