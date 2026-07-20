@@ -17,6 +17,7 @@ jobs:
         uses: actions/checkout@v4
         with:
           ref: main
+          fetch-depth: 0
 
       - name: Setup Node.js
         uses: actions/setup-node@v4
@@ -36,62 +37,46 @@ jobs:
       - name: Prepare production artifact
         run: |
           mkdir -p _deploy
-          # Compiled JS + declarations
           cp -r dist/ _deploy/dist/
-          # Production node_modules
           cp -r node_modules/ _deploy/node_modules/
-          # Package files
           cp package.json package-lock.json _deploy/
-          # Runner scripts
           mkdir -p _deploy/scripts
           cp scripts/update-checker.js _deploy/scripts/
           cp scripts/prod-start.sh _deploy/scripts/
           chmod +x _deploy/scripts/prod-start.sh
-          # PM2 ecosystem
           mkdir -p _deploy/ecosystem
           cp ecosystem/ecosystem.config.js _deploy/ecosystem/
 
-      - name: Ensure production branch exists
+      - name: Deploy to _pm2_prod_run
         run: |
-          if ! git ls-remote --heads origin _pm2_prod_run | grep -q _pm2_prod_run; then
-            echo "Creating _pm2_prod_run branch..."
-            TMP=$(mktemp -d)
-            cd "$TMP"
-            git init -b _pm2_prod_run
-            git config user.name "github-actions[bot]"
-            git config user.email "github-actions[bot]@users.noreply.github.com"
-            git commit --allow-empty -m "init: empty production branch"
-            git remote add origin "https://x-access-token:${{ secrets.GITHUB_TOKEN }}@github.com/${{ github.repository }}.git"
-            git push --force origin _pm2_prod_run
-            cd -
-          fi
+          # Save artifacts outside repo
+          cp -r _deploy /tmp/renne-deploy
+          SHORT_SHA=$(git rev-parse --short HEAD)
 
-      - name: Checkout production branch
-        uses: actions/checkout@v4
-        with:
-          ref: _pm2_prod_run
-          path: _prod
-          fetch-depth: 0
-
-      - name: Deploy to production branch
-        run: |
-          cd _prod
-
-          # Clear old files (keep .git)
-          find . -maxdepth 1 ! -name '.git' ! -name '.' -exec rm -rf {} +
-
-          # Copy build artifacts
-          cp -r ../_deploy/* .
-
-          # Commit
+          # Configure git
           git config user.name "github-actions[bot]"
           git config user.email "github-actions[bot]@users.noreply.github.com"
-          git add -A
-          # Only commit if there are changes
-          if git diff --cached --quiet; then
-            echo "No changes to commit"
+
+          # Fetch production branch if it exists
+          git fetch origin _pm2_prod_run 2>/dev/null || true
+
+          # Switch to production branch
+          if git show-ref --verify --quiet refs/remotes/origin/_pm2_prod_run; then
+            git checkout -B _pm2_prod_run origin/_pm2_prod_run
           else
-            SHORT_SHA=$(git -C ../.. rev-parse --short HEAD)
-            git commit -m "build: deploy ${SHORT_SHA} from main"
-            git push --force origin _pm2_prod_run
+            git checkout --orphan _pm2_prod_run
           fi
+
+          # Remove all tracked files (clear the branch)
+          git rm -rf . >/dev/null 2>&1 || true
+
+          # Remove any remaining untracked files (keep .git)
+          find . -maxdepth 1 ! -name '.git' ! -name '.' -exec rm -rf {} +
+
+          # Copy fresh artifacts
+          cp -r /tmp/renne-deploy/* .
+
+          # Commit and force-push
+          git add -A
+          git commit -m "build: deploy ${SHORT_SHA} from main" --allow-empty
+          git push --force origin _pm2_prod_run
