@@ -61,8 +61,8 @@ jobs:
             git config user.name "github-actions[bot]"
             git config user.email "github-actions[bot]@users.noreply.github.com"
             git commit --allow-empty -m "init: empty production branch"
-            git remote add origin "https://x-access-token:${GITHUB_TOKEN}@github.com/${{ github.repository }}.git"
-            git push origin _pm2_prod_run
+            git remote add origin "https://x-access-token:${{ secrets.GITHUB_TOKEN }}@github.com/${{ github.repository }}.git"
+            git push --force origin _pm2_prod_run
             cd -
           fi
 
@@ -93,5 +93,5 @@ jobs:
           else
             SHORT_SHA=$(git -C ../.. rev-parse --short HEAD)
             git commit -m "build: deploy ${SHORT_SHA} from main"
-            git push origin _pm2_prod_run
+            git push --force origin _pm2_prod_run
           fi
