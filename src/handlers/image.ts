@@ -1,7 +1,6 @@
-import { Context } from 'grammy';
+import { Context, InputFile } from 'grammy';
 import * as fs from 'fs';
 import { tempFilePath, cleanupFile } from '../utils/tg';
-import { getGoogleSearchUrl, getYandereSearchUrl } from '../modules/search';
 
 /**
  * Handle incoming image messages — ask user what to do
@@ -9,11 +8,6 @@ import { getGoogleSearchUrl, getYandereSearchUrl } from '../modules/search';
 export async function handleImage(ctx: Context) {
   const photo = ctx.message?.photo;
   if (!photo) return;
-
-  const caption = ctx.message?.caption || '';
-
-  // Store image file_id in message context for later use
-  const fileId = photo[photo.length - 1].file_id; // largest size
 
   const replyText = `🖼 **What would you like to do with this image?**
 
@@ -38,7 +32,6 @@ export async function handleImageAction(ctx: Context, action: '1' | '2' | '3') {
   const photo = repliedMsg.photo;
   const fileId = photo[photo.length - 1].file_id;
 
-  // Download the image
   const file = await ctx.api.getFile(fileId);
   const filePath = tempFilePath('input.jpg');
   const fileUrl = `https://api.telegram.org/file/bot${process.env.BOT_TOKEN}/${file.file_path}`;
@@ -50,17 +43,15 @@ export async function handleImageAction(ctx: Context, action: '1' | '2' | '3') {
   try {
     switch (action) {
       case '1': {
-        // Convert to GIF
         const { videoToGif } = await import('../modules/media.js');
         const { createProgress } = await import('../utils/progress.js');
         const progress = await createProgress(ctx, '⏳ Converting image to GIF...');
         try {
           const gifPath = await videoToGif(filePath);
           await progress.delete();
-          await ctx.replyWithAnimation(
-            { source: fs.createReadStream(gifPath) as any },
-            { reply_parameters: { message_id: repliedMsg.message_id } }
-          );
+          await ctx.replyWithAnimation(new InputFile(gifPath), {
+            reply_parameters: { message_id: repliedMsg.message_id },
+          });
           cleanupFile(gifPath);
         } catch (err) {
           await progress.update('❌ Failed to convert to GIF.');
@@ -69,9 +60,6 @@ export async function handleImageAction(ctx: Context, action: '1' | '2' | '3') {
         break;
       }
       case '2': {
-        // Google Image Search
-        // We need a publicly accessible URL, but Telegram photos aren't public
-        // So we reply with the search link using a temp hosting approach
         await ctx.reply(
           `🔍 **Google Lens Search**\n\nTo search, right-click the image and use "Search image with Google Lens", or:\n\n[Open Google Lens](https://lens.google.com)`,
           {
@@ -82,7 +70,6 @@ export async function handleImageAction(ctx: Context, action: '1' | '2' | '3') {
         break;
       }
       case '3': {
-        // Yandere Search
         await ctx.reply(
           `🔍 **Yandex Image Search**\n\n[Open Yandex Images](https://yandex.com/images)\n\nUpload the image there for reverse search.`,
           {

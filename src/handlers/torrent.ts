@@ -1,6 +1,5 @@
-import { Context } from 'grammy';
+import { Context, InputFile } from 'grammy';
 import * as fs from 'fs';
-import * as path from 'path';
 import {
   downloadTorrent,
   crawlMagnet,
@@ -10,11 +9,10 @@ import {
 } from '../modules/torrent';
 import { compressImage, uncompressedImage } from '../modules/media';
 import { zipDirectory } from '../modules/zipper';
-import { createProgress, ProgressTracker } from '../utils/progress';
+import { createProgress } from '../utils/progress';
 import {
   tempFilePath,
   cleanupFile,
-  cleanupDir,
   formatSize,
 } from '../utils/tg';
 import {
@@ -22,7 +20,6 @@ import {
   isImageFile,
   isVideoFile,
   isTorrentFile,
-  getExtension,
 } from '../utils/constants';
 
 /**
@@ -36,7 +33,6 @@ export async function handleTorrentFile(ctx: Context) {
 
   await ctx.reply('📥 Received torrent file, crawling info...');
 
-  // Download torrent file to temp
   const file = await ctx.api.getFile(doc.file_id);
   const fileUrl = `https://api.telegram.org/file/bot${process.env.BOT_TOKEN}/${file.file_path}`;
   const response = await fetch(fileUrl);
@@ -81,7 +77,6 @@ async function processTorrent(
   info: TorrentInfo,
   torrentSource: string | Buffer
 ) {
-  // Show file summary
   const summary = info.files
     .slice(0, 20)
     .map((f) => `• ${f.name} (${formatSize(f.size)})`)
@@ -96,35 +91,26 @@ async function processTorrent(
     { parse_mode: 'Markdown' }
   );
 
-  // Check if it's within single file limit
   if (info.totalSize <= TG_MAX_FILE_SIZE && info.files.length <= 1) {
-    // Single file ≤ 2GB — download and upload directly
     await downloadAndUploadSingle(ctx, info, torrentSource);
   } else if (info.files.length === 1 && info.files[0].size > TG_MAX_FILE_SIZE) {
-    // Single file > 2GB but it's a video — download and send as video
     const file = info.files[0];
     if (isVideoFile(file.name)) {
       await downloadAndUploadSingle(ctx, info, torrentSource);
     } else {
-      // Too large, zip it
       await downloadAndZip(ctx, info, torrentSource);
     }
   } else if (info.totalSize > TG_MAX_FILE_SIZE) {
-    // Multiple files or single large file
     const cats = categorizeFiles(info.files);
 
     if (cats.videos.length === 1 && cats.images.length === 0 && cats.others.length === 0) {
-      // Single video
       await downloadAndUploadSingle(ctx, info, torrentSource);
     } else if (cats.images.length > 0 && cats.videos.length === 0 && cats.others.length === 0) {
-      // Images only — download and send compressed + uncompressed
       await downloadAndSendImages(ctx, info, torrentSource);
     } else {
-      // Mixed or large folder — zip it
       await downloadAndZip(ctx, info, torrentSource);
     }
   } else {
-    // Under 2GB total — try to send all
     await downloadAndUploadAll(ctx, info, torrentSource);
   }
 }
@@ -132,7 +118,7 @@ async function processTorrent(
 async function downloadAndUploadSingle(
   ctx: Context,
   info: TorrentInfo,
-  source: string
+  source: string | Buffer
 ) {
   const progress = await createProgress(ctx, '⬇️ Starting download...');
 
@@ -144,20 +130,17 @@ async function downloadAndUploadSingle(
     await progress.update('📤 Uploading to Telegram...');
 
     if (isVideoFile(file.name)) {
-      await ctx.replyWithVideo(
-        { source: file.path as any },
-        { caption: `📥 Downloaded from torrent` }
-      );
+      await ctx.replyWithVideo(new InputFile(file.path), {
+        caption: '📥 Downloaded from torrent',
+      });
     } else if (isImageFile(file.name)) {
-      await ctx.replyWithPhoto(
-        { source: file.path as any },
-        { caption: `📥 Downloaded from torrent` }
-      );
+      await ctx.replyWithPhoto(new InputFile(file.path), {
+        caption: '📥 Downloaded from torrent',
+      });
     } else {
-      await ctx.replyWithDocument(
-        { source: file.path as any, filename: file.name },
-        { caption: `📥 Downloaded from torrent` }
-      );
+      await ctx.replyWithDocument(new InputFile(file.path, file.name), {
+        caption: '📥 Downloaded from torrent',
+      });
     }
 
     await progress.delete();
@@ -170,7 +153,7 @@ async function downloadAndUploadSingle(
 async function downloadAndSendImages(
   ctx: Context,
   info: TorrentInfo,
-  source: string
+  source: string | Buffer
 ) {
   const progress = await createProgress(ctx, '⬇️ Starting download...');
 
@@ -182,20 +165,16 @@ async function downloadAndSendImages(
       if (!isImageFile(file.name)) continue;
 
       try {
-        // Send compressed
         const compressed = await compressImage(file.path);
-        await ctx.replyWithPhoto(
-          { source: compressed as any },
-          { caption: `📦 Compressed: ${file.name}` }
-        );
+        await ctx.replyWithPhoto(new InputFile(compressed), {
+          caption: `📦 Compressed: ${file.name}`,
+        });
         cleanupFile(compressed);
 
-        // Send uncompressed
         const uncompressed = await uncompressedImage(file.path);
-        await ctx.replyWithPhoto(
-          { source: uncompressed as any },
-          { caption: `📦 Original: ${file.name}` }
-        );
+        await ctx.replyWithPhoto(new InputFile(uncompressed), {
+          caption: `📦 Original: ${file.name}`,
+        });
         cleanupFile(uncompressed);
       } catch (err) {
         await ctx.reply(`❌ Failed to send ${file.name}`);
@@ -212,7 +191,7 @@ async function downloadAndSendImages(
 async function downloadAndZip(
   ctx: Context,
   info: TorrentInfo,
-  source: string
+  source: string | Buffer
 ) {
   const progress = await createProgress(ctx, '⬇️ Starting download...');
 
@@ -229,8 +208,11 @@ async function downloadAndZip(
 
     await progress.update('📤 Sending ZIP file...');
     await ctx.replyWithDocument(
-      { source: finalZip as any, filename: `${info.name}.zip` },
-      { caption: `📦 Downloaded from **${info.name}** (${formatSize(zipSize)})`, parse_mode: 'Markdown' }
+      new InputFile(finalZip, `${info.name}.zip`),
+      {
+        caption: `📦 Downloaded from **${info.name}** (${formatSize(zipSize)})`,
+        parse_mode: 'Markdown',
+      }
     );
 
     await progress.delete();
@@ -244,7 +226,7 @@ async function downloadAndZip(
 async function downloadAndUploadAll(
   ctx: Context,
   info: TorrentInfo,
-  source: string
+  source: string | Buffer
 ) {
   const progress = await createProgress(ctx, '⬇️ Starting download...');
 
@@ -255,30 +237,25 @@ async function downloadAndUploadAll(
     for (const file of result.files) {
       try {
         if (isVideoFile(file.name)) {
-          await ctx.replyWithVideo(
-            { source: file.path as any },
-            { caption: `📥 ${file.name}` }
-          );
+          await ctx.replyWithVideo(new InputFile(file.path), {
+            caption: `📥 ${file.name}`,
+          });
         } else if (isImageFile(file.name)) {
-          // Send compressed + uncompressed
           const compressed = await compressImage(file.path);
-          await ctx.replyWithPhoto(
-            { source: compressed as any },
-            { caption: `📦 Compressed: ${file.name}` }
-          );
+          await ctx.replyWithPhoto(new InputFile(compressed), {
+            caption: `📦 Compressed: ${file.name}`,
+          });
           cleanupFile(compressed);
 
           const uncompressed = await uncompressedImage(file.path);
-          await ctx.replyWithPhoto(
-            { source: uncompressed as any },
-            { caption: `📦 Original: ${file.name}` }
-          );
+          await ctx.replyWithPhoto(new InputFile(uncompressed), {
+            caption: `📦 Original: ${file.name}`,
+          });
           cleanupFile(uncompressed);
         } else {
-          await ctx.replyWithDocument(
-            { source: file.path as any, filename: file.name },
-            { caption: `📥 ${file.name}` }
-          );
+          await ctx.replyWithDocument(new InputFile(file.path, file.name), {
+            caption: `📥 ${file.name}`,
+          });
         }
       } catch (err) {
         await ctx.reply(`❌ Failed to send ${file.name}`);

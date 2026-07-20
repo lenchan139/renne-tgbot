@@ -1,4 +1,4 @@
-import * as archiver from 'archiver';
+import archiver from 'archiver';
 import * as fs from 'fs';
 import { ProgressTracker } from '../utils/progress';
 
@@ -22,7 +22,7 @@ export function zipDirectory(
     let fileCount = 0;
     let totalSize = 0;
 
-    archive.on('progress', (p) => {
+    archive.on('progress', (p: { entries: { processed: number } }) => {
       fileCount = p.entries.processed;
       if (progress) {
         progress.update(`📦 Zipping: ${fileCount} files processed...`);

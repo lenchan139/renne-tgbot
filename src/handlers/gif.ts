@@ -1,4 +1,4 @@
-import { Context } from 'grammy';
+import { Context, InputFile } from 'grammy';
 import * as fs from 'fs';
 import { tempFilePath, cleanupFile } from '../utils/tg';
 
@@ -42,17 +42,15 @@ export async function handleGifAction(ctx: Context, action: '1' | '2') {
   try {
     switch (action) {
       case '1': {
-        // Convert to video
         const { gifToVideo } = await import('../modules/media.js');
         const { createProgress } = await import('../utils/progress.js');
         const progress = await createProgress(ctx, '⏳ Converting GIF to video...');
         try {
           const videoPath = await gifToVideo(filePath);
           await progress.delete();
-          await ctx.replyWithVideo(
-            { source: fs.createReadStream(videoPath) as any },
-            { reply_parameters: { message_id: repliedMsg.message_id } }
-          );
+          await ctx.replyWithVideo(new InputFile(videoPath), {
+            reply_parameters: { message_id: repliedMsg.message_id },
+          });
           cleanupFile(videoPath);
         } catch (err) {
           await progress.update('❌ Failed to convert GIF to video.');
@@ -61,14 +59,12 @@ export async function handleGifAction(ctx: Context, action: '1' | '2') {
         break;
       }
       case '2': {
-        // Extract frame
         const { gifToImage } = await import('../modules/media.js');
         try {
           const imgPath = await gifToImage(filePath);
-          await ctx.replyWithPhoto(
-            { source: fs.createReadStream(imgPath) as any },
-            { reply_parameters: { message_id: repliedMsg.message_id } }
-          );
+          await ctx.replyWithPhoto(new InputFile(imgPath), {
+            reply_parameters: { message_id: repliedMsg.message_id },
+          });
           cleanupFile(imgPath);
         } catch (err) {
           await ctx.reply('❌ Failed to extract frame from GIF.');

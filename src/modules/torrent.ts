@@ -1,15 +1,13 @@
-import * as WebTorrent from 'webtorrent';
-import * as parseTorrent from 'parse-torrent';
+const WebTorrent = require('webtorrent');
+const parseTorrent = require('parse-torrent');
 import * as fs from 'fs';
 import * as path from 'path';
 import { ProgressTracker } from '../utils/progress';
 import {
-  TG_MAX_FILE_SIZE,
   isImageFile,
   isVideoFile,
-  getExtension,
 } from '../utils/constants';
-import { tempFilePath, ensureTmpDir, cleanupDir } from '../utils/tg';
+import { tempFilePath, ensureTmpDir } from '../utils/tg';
 
 export interface TorrentFile {
   name: string;
@@ -26,8 +24,8 @@ export interface TorrentInfo {
 /**
  * Create a WebTorrent client (singleton per process)
  */
-let client: WebTorrent.Instance | null = null;
-function getClient(): WebTorrent.Instance {
+let client: any = null;
+function getClient(): any {
   if (!client) {
     client = new WebTorrent();
   }
@@ -46,7 +44,7 @@ export function crawlMagnet(magnetUri: string): Promise<TorrentInfo> {
       const info: TorrentInfo = {
         name: torrent.name,
         totalSize: torrent.length,
-        files: torrent.files.map((f) => ({
+        files: torrent.files.map((f: any) => ({
           name: f.name,
           path: f.path,
           size: f.length,
@@ -77,7 +75,6 @@ export function crawlTorrentBuffer(buf: Buffer): Promise<TorrentInfo> {
     if (!parsed.info) {
       return reject(new Error('Invalid torrent file'));
     }
-    // We can get basic info from parsed, but for file list we need webtorrent
     const wt = getClient();
     const torrent = wt.add(parsed, { destroyStoreOnDestroy: true });
 
@@ -85,7 +82,7 @@ export function crawlTorrentBuffer(buf: Buffer): Promise<TorrentInfo> {
       const info: TorrentInfo = {
         name: torrent.name,
         totalSize: torrent.length,
-        files: torrent.files.map((f) => ({
+        files: torrent.files.map((f: any) => ({
           name: f.name,
           path: f.path,
           size: f.length,
@@ -115,7 +112,6 @@ export interface DownloadResult {
 
 /**
  * Download a torrent and return the download directory path.
- * Returns after all files are downloaded.
  */
 export function downloadTorrent(
   magnetOrTorrent: string | Buffer,
@@ -126,7 +122,7 @@ export function downloadTorrent(
     const wt = getClient();
     ensureTmpDir();
 
-    const torrent = wt.add(magnetOrTorrent as any, {
+    const torrent = wt.add(magnetOrTorrent, {
       path: ensureTmpDir(),
       destroyStoreOnDestroy: true,
     });
@@ -148,7 +144,7 @@ export function downloadTorrent(
       if (progress) progress.update('✅ Download complete, processing...');
 
       const dirPath = path.join(ensureTmpDir(), torrent.name);
-      const files: TorrentFile[] = torrent.files.map((f) => ({
+      const files: TorrentFile[] = torrent.files.map((f: any) => ({
         name: f.name,
         path: path.join(ensureTmpDir(), f.path),
         size: f.length,

@@ -1,5 +1,5 @@
-import * as sharp from 'sharp';
-import * as ffmpeg from 'fluent-ffmpeg';
+import sharp from 'sharp';
+import ffmpeg from 'fluent-ffmpeg';
 import * as path from 'path';
 import { tempFilePath } from '../utils/tg';
 
@@ -46,7 +46,7 @@ export async function videoToGif(
         '-loop', '0',
       ])
       .output(outputPath)
-      .on('progress', (p) => {
+      .on('progress', (p: { percent?: number }) => {
         if (onProgress && p.percent) onProgress(Math.round(p.percent));
       })
       .on('end', () => resolve(outputPath))

@@ -1,4 +1,4 @@
-import { Context } from 'grammy';
+import { Context, InputFile } from 'grammy';
 import * as fs from 'fs';
 import { tempFilePath, cleanupFile } from '../utils/tg';
 
@@ -40,19 +40,17 @@ export async function handleVideoAction(ctx: Context, action: '1') {
 
   try {
     if (action === '1') {
-      // Convert to GIF
       const { videoToGif } = await import('../modules/media.js');
       const { createProgress } = await import('../utils/progress.js');
       const progress = await createProgress(ctx, '⏳ Converting video to GIF...');
       try {
-        const gifPath = await videoToGif(filePath, (pct) => {
+        const gifPath = await videoToGif(filePath, (pct: number) => {
           progress.update(`⏳ Converting video to GIF... ${pct}%`);
         });
         await progress.delete();
-        await ctx.replyWithAnimation(
-          { source: fs.createReadStream(gifPath) as any },
-          { reply_parameters: { message_id: repliedMsg.message_id } }
-        );
+        await ctx.replyWithAnimation(new InputFile(gifPath), {
+          reply_parameters: { message_id: repliedMsg.message_id },
+        });
         cleanupFile(gifPath);
       } catch (err) {
         await progress.update('❌ Failed to convert video to GIF.');
