@@ -6,21 +6,21 @@ import {
   crawlTorrentBuffer,
   categorizeFiles,
   TorrentInfo,
-} from '../modules/torrent';
-import { compressImage, uncompressedImage } from '../modules/media';
-import { zipDirectory } from '../modules/zipper';
-import { createProgress } from '../utils/progress';
+} from '../modules/torrent.js';
+import { compressImage, uncompressedImage } from '../modules/media.js';
+import { zipDirectory } from '../modules/zipper.js';
+import { createProgress } from '../utils/progress.js';
 import {
   tempFilePath,
   cleanupFile,
   formatSize,
-} from '../utils/tg';
+} from '../utils/tg.js';
 import {
   TG_MAX_FILE_SIZE,
   isImageFile,
   isVideoFile,
   isTorrentFile,
-} from '../utils/constants';
+} from '../utils/constants.js';
 
 /**
  * Handle a torrent file upload

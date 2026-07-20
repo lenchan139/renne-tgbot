@@ -1,10 +1,10 @@
 import sharp from 'sharp';
 import ffmpeg from 'fluent-ffmpeg';
 import * as path from 'path';
-import { tempFilePath } from '../utils/tg';
+import { tempFilePath } from '../utils/tg.js';
 
 /**
- * Compress an image to ~50% quality, returning new file path
+ * Compress an image to ~60% quality
  */
 export async function compressImage(inputPath: string): Promise<string> {
   const outputPath = tempFilePath('compressed.jpg');
@@ -21,7 +21,7 @@ export async function compressImage(inputPath: string): Promise<string> {
  * Convert image to PNG (uncompressed)
  */
 export async function uncompressedImage(inputPath: string): Promise<string> {
-  const outputPath = tempFilePath(`original.png`);
+  const outputPath = tempFilePath('original.png');
 
   await sharp(inputPath)
     .png()

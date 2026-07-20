@@ -1,6 +1,6 @@
 import { Context, InputFile } from 'grammy';
 import * as fs from 'fs';
-import { tempFilePath, cleanupFile } from '../utils/tg';
+import { tempFilePath, cleanupFile } from '../utils/tg.js';
 
 /**
  * Handle incoming GIF messages — ask user what to do

@@ -2,12 +2,12 @@ const WebTorrent = require('webtorrent');
 const parseTorrent = require('parse-torrent');
 import * as fs from 'fs';
 import * as path from 'path';
-import { ProgressTracker } from '../utils/progress';
+import { ProgressTracker } from '../utils/progress.js';
 import {
   isImageFile,
   isVideoFile,
-} from '../utils/constants';
-import { tempFilePath, ensureTmpDir } from '../utils/tg';
+} from '../utils/constants.js';
+import { tempFilePath, ensureTmpDir } from '../utils/tg.js';
 
 export interface TorrentFile {
   name: string;

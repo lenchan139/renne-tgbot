@@ -1,6 +1,6 @@
 import archiver from 'archiver';
 import * as fs from 'fs';
-import { ProgressTracker } from '../utils/progress';
+import { ProgressTracker } from '../utils/progress.js';
 
 export interface ZipResult {
   zipPath: string;
@@ -17,10 +17,9 @@ export function zipDirectory(
 ): Promise<ZipResult> {
   return new Promise((resolve, reject) => {
     const output = fs.createWriteStream(outputPath);
-    const archive = archiver('zip', { zlib: { level: 1 } }); // Fast compression
+    const archive = archiver('zip', { zlib: { level: 1 } });
 
     let fileCount = 0;
-    let totalSize = 0;
 
     archive.on('progress', (p: { entries: { processed: number } }) => {
       fileCount = p.entries.processed;
@@ -31,7 +30,6 @@ export function zipDirectory(
 
     archive.pipe(output);
 
-    // Add all files in the directory
     archive.directory(dirPath, false);
 
     output.on('close', () => {

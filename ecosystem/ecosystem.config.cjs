@@ -18,7 +18,7 @@ module.exports = {
     },
     {
       name: "renne-updater",
-      script: "./scripts/update-checker.js",
+      script: "./scripts/update-checker.cjs",
       cwd: __dirname + "/../",
       interpreter: "node",
       autorestart: true,

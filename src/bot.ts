@@ -1,17 +1,17 @@
 import { Bot, Context } from 'grammy';
-import * as dotenv from 'dotenv';
-import { startCommand } from './commands/start';
-import { helpCommand } from './commands/help';
-import { btCommand } from './commands/bt';
-import { handleImage, handleImageAction } from './handlers/image';
-import { handleVideo, handleVideoAction } from './handlers/video';
-import { handleGif, handleGifAction } from './handlers/gif';
-import { handleXUrl } from './handlers/url';
+import dotenv from 'dotenv';
+import { startCommand } from './commands/start.js';
+import { helpCommand } from './commands/help.js';
+import { btCommand } from './commands/bt.js';
+import { handleImage, handleImageAction } from './handlers/image.js';
+import { handleVideo, handleVideoAction } from './handlers/video.js';
+import { handleGif, handleGifAction } from './handlers/gif.js';
+import { handleXUrl } from './handlers/url.js';
 import {
   handleTorrentFile,
   handleMagnetLink,
-} from './handlers/torrent';
-import { extractMagnet } from './utils/tg';
+} from './handlers/torrent.js';
+import { extractMagnet } from './utils/tg.js';
 
 dotenv.config();
 

@@ -1,6 +1,6 @@
 import { Context } from 'grammy';
-import { X_DOMAINS, X_FIXUP_DOMAIN } from '../utils/constants';
-import { isAdmin } from '../utils/tg';
+import { isAdmin } from '../utils/tg.js';
+import { X_DOMAINS, X_FIXUP_DOMAIN } from '../utils/constants.js';
 
 /**
  * Handle x.com / twitter.com URL messages
@@ -11,7 +11,6 @@ export async function handleXUrl(ctx: Context) {
   const text = ctx.message?.text;
   if (!text) return;
 
-  // Find x.com or twitter.com URLs in the message
   const urlRegex = new RegExp(
     `(https?://(?:www\\.)?(${X_DOMAINS.join('|')})/[^\\s]+)`,
     'gi'
@@ -19,7 +18,6 @@ export async function handleXUrl(ctx: Context) {
   const matches = text.match(urlRegex);
   if (!matches || matches.length === 0) return;
 
-  // Build the replacement URL
   let replacedText = text;
   for (const url of matches) {
     const fixupUrl = url.replace(
@@ -34,7 +32,6 @@ export async function handleXUrl(ctx: Context) {
   if (isGroup) {
     const admin = await isAdmin(ctx);
     if (admin && ctx.message?.message_id) {
-      // Edit the original message instead of replying
       try {
         await ctx.api.editMessageText(
           ctx.chat!.id,
@@ -43,12 +40,11 @@ export async function handleXUrl(ctx: Context) {
         );
         return;
       } catch {
-        // If edit fails (e.g. no text permissions), fall back to reply
+        // If edit fails, fall back to reply
       }
     }
   }
 
-  // Reply (PM or non-admin group)
   if (replacedText !== text) {
     await ctx.reply(replacedText, {
       reply_parameters: { message_id: ctx.message!.message_id },

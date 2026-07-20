@@ -2,6 +2,7 @@
   "name": "renne-tgbot",
   "version": "1.0.0",
   "description": "Telegram bot with torrent download, media conversion, and image search",
+  "type": "module",
   "main": "dist/bot.js",
   "scripts": {
     "build": "tsc",
