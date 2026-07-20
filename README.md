@@ -106,27 +106,112 @@ flowchart LR
 2. On the server, `renne-updater` (pm2) polls `_pm2_prod_run` every 60s
 3. If new commit detected → `git pull` → `npm ci` → `pm2 restart renne-tgbot`
 
-### Initial Server Setup
+### Initial Server Setup (Synology NAS)
+
+**1. Install DSM packages**
+
+Open **Package Center** → Install:
+- **Git Server** (or just Git)
+- **Node.js** (via Synology Package Center — look for v18+)
+
+If Node.js isn't available in Package Center, use [SynoCommunity](https://synocommunity.com/):
+```bash
+# Add SynoCommunity package source in Package Center
+# Then install Node.js and ffmpeg from there
+```
+
+**2. Install ffmpeg**
+
+Option A — SynoCommunity (recommended):
+- Install `ffmpeg` package from SynoCommunity
+
+Option B — Manual:
+```bash
+cd /tmp
+wget https://johnvansickle.com/ffmpeg/releases/ffmpeg-release-amd64-static.tar.xz
+tar xf ffmpeg-release-amd64-static.tar.xz
+sudo cp ffmpeg-*/ffmpeg /usr/local/bin/
+sudo cp ffmpeg-*/ffprobe /usr/local/bin/
+```
+
+Verify:
+```bash
+ffmpeg -version | head -1
+```
+
+**3. SSH into your NAS and clone the production branch**
 
 ```bash
-# Clone the production branch
-git clone -b _pm2_prod_run <repo-url> /opt/renne-bot
-cd /opt/renne-bot
+ssh admin@your-nas-ip
 
-# Set your bot token
+# Create directory
+mkdir -p /volume1/docker/renne-bot
+
+# Clone production branch (contains compiled JS + runner)
+git clone -b _pm2_prod_run https://github.com/lenchan139/renne-tgbot.git /volume1/docker/renne-bot
+cd /volume1/docker/renne-bot
+```
+
+**4. Configure environment**
+
+```bash
+# Create .env from example
 cp .env.example .env
-nano .env
 
-# Run the bootstrap script
+# Edit with vi (nano may not be available on DSM)
+vi .env
+```
+
+`.env` contents:
+```
+BOT_TOKEN=your_telegram_bot_token_here
+```
+
+> Get a bot token from [@BotFather](https://t.me/BotFather)
+
+**5. Run the bootstrap script**
+
+```bash
 bash scripts/prod-start.sh
 ```
 
-### Server Requirements
+This will:
+- Install pm2 globally (if missing)
+- Install production npm dependencies
+- Start both `renne-tgbot` and `renne-updater` processes
 
-- Node.js ≥ 18
-- ffmpeg (`sudo apt install ffmpeg`)
-- Git
-- pm2 (installed automatically by `prod-start.sh`)
+**6. Verify everything is running**
+
+```bash
+pm2 status
+```
+
+You should see:
+```
+renne-tgbot   ● online  0s  0 MB  enabled
+renne-updater ● online  0s  0 MB  enabled
+```
+
+---
+
+### What happens after setup?
+
+- The **bot** runs continuously and responds to Telegram messages
+- The **updater** checks `_pm2_prod_run` branch every 60 seconds
+- When you push to `main`, GitHub Actions builds and pushes to `_pm2_prod_run`
+- The updater detects the new commit, pulls it, runs `npm ci`, and restarts the bot
+- **Zero manual intervention** required for updates
+
+---
+
+### Server Requirements (Synology)
+
+| Requirement | How to Install |
+|-------------|---------------|
+| Node.js ≥ 18 | Package Center or [SynoCommunity](https://synocommunity.com/) |
+| ffmpeg | SynoCommunity package or [johnvansickle static build](https://johnvansickle.com/ffmpeg/) |
+| Git | DSM Package Center → Git Server |
+| pm2 | auto-installed by `prod-start.sh` |
 
 ### Useful Commands
 
