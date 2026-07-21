@@ -1,7 +1,20 @@
 import sharp from 'sharp';
 import ffmpeg from 'fluent-ffmpeg';
 import * as fs from 'fs';
+import * as path from 'path';
+import { fileURLToPath } from 'url';
 import { tempFilePath } from '../utils/tg.js';
+// ─── Use bundled ffmpeg binaries ─────────────────────────────
+// These are committed to the repo at bin/ so the NAS doesn't
+// need the crippled system ffmpeg.
+const __dirname = path.dirname(fileURLToPath(import.meta.url));
+const projectRoot = path.resolve(__dirname, '..', '..');
+const ffmpegPath = path.join(projectRoot, 'bin', process.platform === 'win32' ? 'ffmpeg.exe' : 'ffmpeg');
+const ffprobePath = path.join(projectRoot, 'bin', process.platform === 'win32' ? 'ffprobe.exe' : 'ffprobe');
+if (fs.existsSync(ffmpegPath)) {
+    ffmpeg.setFfmpegPath(ffmpegPath);
+    ffmpeg.setFfprobePath(ffprobePath);
+}
 /**
  * Compress an image to ~60% quality
  */
