@@ -24,23 +24,31 @@ export async function uncompressedImage(inputPath) {
     return outputPath;
 }
 /**
- * Convert video to GIF using ffmpeg
+ * Convert video to MP4 animation (Telegram native GIF).
+ *
+ * Telegram's sendAnimation accepts MP4 — it plays as a looping
+ * video without controls, same UX as a GIF but far better quality
+ * and smaller file size.
  */
-export async function videoToGif(inputPath, onProgress) {
-    const outputPath = tempFilePath('output.gif');
+export async function videoToAnimation(inputPath, onProgress) {
+    const outputPath = tempFilePath('output.mp4');
     return new Promise((resolve, reject) => {
         ffmpeg(inputPath)
-            .fps(10)
+            .fps(15)
             .size('480x?')
             .videoFilter('scale=480:-1')
-            .outputOptions(['-loop', '0'])
+            .duration(10) // max 10 seconds for GIF-like clips
+            .outputOptions([
+            '-pix_fmt', 'yuv420p',
+            '-movflags', '+faststart',
+        ])
+            .videoCodec('libx264')
             .output(outputPath)
             .on('progress', (p) => {
             if (onProgress && p.percent)
                 onProgress(Math.round(p.percent));
         })
             .on('end', () => {
-            // Verify output file exists and is non-empty
             try {
                 const stat = fs.statSync(outputPath);
                 if (stat.size === 0) {
@@ -51,6 +59,29 @@ export async function videoToGif(inputPath, onProgress) {
             catch { /* file doesn't exist, reject below */ }
             resolve(outputPath);
         })
+            .on('error', reject)
+            .run();
+    });
+}
+/**
+ * Convert a still image to a short looping MP4 animation.
+ * Uses ffmpeg's image looping to create a seamless Telegram-ready animation.
+ */
+export async function imageToAnimation(inputPath) {
+    const outputPath = tempFilePath('anim.mp4');
+    return new Promise((resolve, reject) => {
+        ffmpeg(inputPath)
+            .loop(2) // loop the image for 2 seconds
+            .fps(10)
+            .size('480x?')
+            .videoFilter('scale=480:-1')
+            .outputOptions([
+            '-pix_fmt', 'yuv420p',
+            '-movflags', '+faststart',
+        ])
+            .videoCodec('libx264')
+            .output(outputPath)
+            .on('end', () => resolve(outputPath))
             .on('error', reject)
             .run();
     });

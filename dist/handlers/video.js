@@ -36,21 +36,21 @@ export async function handleVideoAction(ctx, action) {
     fs.writeFileSync(filePath, buffer);
     try {
         if (action === 'vid_gif') {
-            const { videoToGif } = await import('../modules/media.js');
+            const { videoToAnimation } = await import('../modules/media.js');
             const { createProgress } = await import('../utils/progress.js');
-            const progress = await createProgress(ctx, '⏳ Converting video to GIF...');
+            const progress = await createProgress(ctx, '⏳ Creating animation...');
             try {
-                const gifPath = await videoToGif(filePath, (pct) => {
-                    progress.update(`⏳ Converting video to GIF... ${pct}%`);
+                const animPath = await videoToAnimation(filePath, (pct) => {
+                    progress.update(`⏳ Creating animation... ${pct}%`);
                 });
                 await progress.delete();
-                await ctx.replyWithAnimation(new InputFile(gifPath), {
+                await ctx.replyWithAnimation(new InputFile(animPath), {
                     reply_parameters: { message_id: repliedMsg.message_id },
                 });
-                cleanupFile(gifPath);
+                cleanupFile(animPath);
             }
             catch (err) {
-                await progress.update('❌ Failed to convert video to GIF.');
+                await progress.update('❌ Failed to create animation.');
                 console.error(err);
             }
         }
