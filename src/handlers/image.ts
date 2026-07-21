@@ -12,7 +12,7 @@ export async function handleImage(ctx: Context) {
   const keyboard = new InlineKeyboard()
     .text('1️⃣ Convert to GIF', 'img_gif')
     .text('2️⃣ Google Search', 'img_google')
-    .text('3️⃣ Yandex Search', 'img_yandex');
+    .text('3️⃣ SauceNAO', 'img_saucenao');
 
   await ctx.reply('🖼 **What would you like to do with this image?**', {
     parse_mode: 'Markdown',
@@ -47,18 +47,18 @@ export async function handleImageAction(ctx: Context, action: string) {
   try {
     switch (action) {
       case 'img_gif': {
-        const { videoToGif } = await import('../modules/media.js');
+        const { imageToAnimation } = await import('../modules/media.js');
         const { createProgress } = await import('../utils/progress.js');
-        const progress = await createProgress(ctx, '⏳ Converting image to GIF...');
+        const progress = await createProgress(ctx, '⏳ Creating animation...');
         try {
-          const gifPath = await videoToGif(filePath);
+          const animPath = await imageToAnimation(filePath);
           await progress.delete();
-          await ctx.replyWithAnimation(new InputFile(gifPath), {
+          await ctx.replyWithAnimation(new InputFile(animPath), {
             reply_parameters: { message_id: repliedMsg.message_id },
           });
-          cleanupFile(gifPath);
+          cleanupFile(animPath);
         } catch (err) {
-          await progress.update('❌ Failed to convert to GIF.');
+          await progress.update('❌ Failed to create animation.');
           console.error(err);
         }
         break;
@@ -73,9 +73,9 @@ export async function handleImageAction(ctx: Context, action: string) {
         );
         break;
       }
-      case 'img_yandex': {
+      case 'img_saucenao': {
         await ctx.reply(
-          `🔍 **Yandex Image Search**\n\n[Open Yandex Images](https://yandex.com/images)\n\nUpload the image there for reverse search.`,
+          `🔍 **SauceNAO Image Search**\n\nUpload the image to [SauceNAO](https://saucenao.com) for reverse image search (anime/artwork source lookup).`,
           {
             parse_mode: 'Markdown',
             reply_parameters: { message_id: repliedMsg.message_id },
