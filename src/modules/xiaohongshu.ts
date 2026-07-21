@@ -55,7 +55,7 @@ async function downloadViaPackage(
   _options?: DownloadOptions,
 ): Promise<DownloadResult | null> {
   try {
-    const xhs: any = await import('xhs-api');
+    const xhs: any = await import('xhs-api' as any);
     // Try to get a constructor — the package may export default, XhsClient, or itself
     const XhsCtor: any = xhs.default?.XhsClient ?? xhs.default ?? xhs.XhsClient ?? xhs;
     if (typeof XhsCtor !== 'function' && typeof XhsCtor !== 'object') return null;

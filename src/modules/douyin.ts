@@ -90,19 +90,24 @@ export async function downloadDouyin(
     const html = await pageResponse.text();
 
     // 4. Extract JSON data from window.__INITIAL_STATE__
+    let stateJson: string | null = null;
     const stateMatch = html.match(/window\.__INITIAL_STATE__\s*=\s*({.*?});\s*<\/script>/s);
-    if (!stateMatch) {
+    if (stateMatch) {
+      stateJson = stateMatch[1];
+    } else {
       // Try alternative matching — sometimes the JSON is spread across lines
       const altMatch = html.match(/__INITIAL_STATE__\s*=\s*({[\s\S]*?});\s*<\/script>/);
-      if (!altMatch) {
-        return {
-          success: false,
-          error: 'Could not find video data on Douyin page',
-        };
+      if (altMatch) {
+        stateJson = altMatch[1];
       }
     }
 
-    const stateJson = stateMatch ? stateMatch[1] : altMatch![1];
+    if (!stateJson) {
+      return {
+        success: false,
+        error: 'Could not find video data on Douyin page',
+      };
+    }
     let state: any;
     try {
       state = JSON.parse(stateJson);

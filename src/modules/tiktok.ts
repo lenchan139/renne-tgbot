@@ -139,7 +139,7 @@ async function tryPackage(
   _options?: DownloadOptions,
 ): Promise<string | null> {
   try {
-    const tiktokDl = await import('tiktok-dl');
+    const tiktokDl: any = await import('tiktok-dl');
     // The package API varies; attempt common patterns.
     const result: any =
       (await tiktokDl.default?.(tiktokUrl)) ?? (await tiktokDl.default?.download?.(tiktokUrl));

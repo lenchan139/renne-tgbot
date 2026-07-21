@@ -87,7 +87,7 @@ async function ensureToken(): Promise<string> {
     }),
   });
 
-  const data: TelegraphResponse<{ access_token: string }> = await res.json();
+  const data: TelegraphResponse<{ access_token: string }> = await res.json() as any;
   if (!data.ok || !data.result) {
     throw new Error(`Telegraph createAccount failed: ${data.error}`);
   }
@@ -240,7 +240,7 @@ export async function createTelegraphPage(
     }),
   });
 
-  const data: TelegraphResponse<TelegraphPage> = await res.json();
+  const data: TelegraphResponse<TelegraphPage> = await res.json() as any;
   if (!data.ok || !data.result) {
     throw new Error(`Telegraph createPage failed: ${data.error}`);
   }

@@ -134,7 +134,7 @@ export async function processWechatArticle(url: string): Promise<WechatResult> {
  */
 function processContent(
   $: cheerio.CheerioAPI,
-  $el: cheerio.Cheerio<Element>,
+  $el: cheerio.Cheerio<any>,
 ): string {
   // Remove unwanted elements
   const $clone = $el.clone();
@@ -145,7 +145,7 @@ function processContent(
 
   for (const node of children) {
     if (node.type === 'text') {
-      const text = (node as cheerio.TextElement).data?.trim();
+      const text = (node as any).data?.trim();
       if (text) {
         parts.push(`<p>${escapeHtml(text)}</p>`);
       }
@@ -214,13 +214,13 @@ function processContent(
  */
 function processInlineContent(
   $: cheerio.CheerioAPI,
-  $el: cheerio.Cheerio<Element>,
+  $el: cheerio.Cheerio<any>,
 ): string {
   let html = '';
 
   for (const node of $el.contents().toArray()) {
     if (node.type === 'text') {
-      const data = (node as cheerio.TextElement).data ?? '';
+      const data = (node as any).data ?? '';
       html += escapeHtml(data);
     } else if (node.type === 'tag') {
       const $child = $(node);
