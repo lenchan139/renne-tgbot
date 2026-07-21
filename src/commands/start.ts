@@ -1,7 +1,7 @@
 import { Context } from 'grammy';
 
 export async function startCommand(ctx: Context) {
-  const text = `👋 **......どうかしら？**
+  const text = `👋 **...どうかしら？**
 
 I can help you with:
 

@@ -1,31 +1,35 @@
-import { Context, InputFile } from 'grammy';
+import { Context, InputFile, InlineKeyboard } from 'grammy';
 import * as fs from 'fs';
 import { tempFilePath, cleanupFile } from '../utils/tg.js';
 
 /**
- * Handle incoming video messages — ask user what to do
+ * Handle incoming video messages — ask user what to do via inline buttons
  */
 export async function handleVideo(ctx: Context) {
   const video = ctx.message?.video;
   if (!video) return;
 
-  const replyText = `🎬 **What would you like to do with this video?**
+  const keyboard = new InlineKeyboard()
+    .text('1️⃣ Convert to GIF', 'vid_gif');
 
-Reply with:
-1️⃣ Convert to GIF`;
-
-  await ctx.reply(replyText, {
+  await ctx.reply('🎬 **What would you like to do with this video?**', {
     parse_mode: 'Markdown',
+    reply_markup: keyboard,
     reply_parameters: { message_id: ctx.message!.message_id },
   });
 }
 
 /**
- * Handle video action selection
+ * Handle video action from inline button callback
  */
-export async function handleVideoAction(ctx: Context, action: '1') {
-  const repliedMsg = ctx.message?.reply_to_message;
-  if (!repliedMsg?.video) return;
+export async function handleVideoAction(ctx: Context, action: string) {
+  const repliedMsg = ctx.callbackQuery?.message?.reply_to_message;
+  if (!repliedMsg?.video) {
+    await ctx.answerCallbackQuery('⚠️ Original video not found');
+    return;
+  }
+
+  await ctx.answerCallbackQuery();
 
   const video = repliedMsg.video;
   const fileId = video.file_id;
@@ -39,7 +43,7 @@ export async function handleVideoAction(ctx: Context, action: '1') {
   fs.writeFileSync(filePath, buffer);
 
   try {
-    if (action === '1') {
+    if (action === 'vid_gif') {
       const { videoToGif } = await import('../modules/media.js');
       const { createProgress } = await import('../utils/progress.js');
       const progress = await createProgress(ctx, '⏳ Converting video to GIF...');
