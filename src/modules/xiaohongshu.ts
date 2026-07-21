@@ -55,10 +55,11 @@ async function downloadViaPackage(
   _options?: DownloadOptions,
 ): Promise<DownloadResult | null> {
   try {
-    const xhs = await import('xhs-api');
-    // The package exposes a client; exact API depends on the version.
-    // We try a common interface pattern.
-    const client = new xhs.default?.XhsClient?.();
+    const xhs: any = await import('xhs-api');
+    // Try to get a constructor — the package may export default, XhsClient, or itself
+    const XhsCtor: any = xhs.default?.XhsClient ?? xhs.default ?? xhs.XhsClient ?? xhs;
+    if (typeof XhsCtor !== 'function' && typeof XhsCtor !== 'object') return null;
+    const client = typeof XhsCtor === 'function' ? new XhsCtor() : XhsCtor;
     const note: any = await client?.getNote?.(noteId);
     if (!note) return null;
 
