@@ -1,5 +1,6 @@
 import sharp from 'sharp';
 import ffmpeg from 'fluent-ffmpeg';
+import * as fs from 'fs';
 import { tempFilePath } from '../utils/tg.js';
 /**
  * Compress an image to ~60% quality
@@ -28,19 +29,30 @@ export async function uncompressedImage(inputPath) {
 export async function videoToGif(inputPath, onProgress) {
     const outputPath = tempFilePath('output.gif');
     return new Promise((resolve, reject) => {
-        const cmd = ffmpeg(inputPath)
-            .outputOptions([
-            '-vf', 'fps=10,scale=480:-1:flags=lanczos,split[s0][s1];[s0]palettegen[p];[s1][p]paletteuse',
-            '-loop', '0',
-        ])
+        ffmpeg(inputPath)
+            .fps(10)
+            .size('480x?')
+            .videoFilter('scale=480:-1')
+            .outputOptions(['-loop', '0'])
             .output(outputPath)
             .on('progress', (p) => {
             if (onProgress && p.percent)
                 onProgress(Math.round(p.percent));
         })
-            .on('end', () => resolve(outputPath))
-            .on('error', reject);
-        cmd.run();
+            .on('end', () => {
+            // Verify output file exists and is non-empty
+            try {
+                const stat = fs.statSync(outputPath);
+                if (stat.size === 0) {
+                    reject(new Error('Output file is empty'));
+                    return;
+                }
+            }
+            catch { /* file doesn't exist, reject below */ }
+            resolve(outputPath);
+        })
+            .on('error', reject)
+            .run();
     });
 }
 /**
