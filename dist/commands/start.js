@@ -1,5 +1,5 @@
 export async function startCommand(ctx) {
-    const text = `👋 **Hi! I'm Renne Bot**
+    const text = `👋 **...どうかしら？**
 
 I can help you with:
 

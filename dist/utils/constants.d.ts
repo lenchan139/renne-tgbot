@@ -8,6 +8,14 @@ export declare const TMP_DIR = "/tmp/renne-bot";
 /** x.com domain replacement */
 export declare const X_DOMAINS: string[];
 export declare const X_FIXUP_DOMAIN = "fixupx.com";
+/**
+ * Platform download domains — used in url.ts routing.
+ * Each entry maps the display name to the URL pattern prefix.
+ */
+export declare const PLATFORM_CONFIGS: Record<string, {
+    domains: string[];
+    name: string;
+}>;
 /** Supported file extensions */
 export declare const IMAGE_EXTENSIONS: string[];
 export declare const VIDEO_EXTENSIONS: string[];

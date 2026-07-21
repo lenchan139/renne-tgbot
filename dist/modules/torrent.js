@@ -1,5 +1,5 @@
-const WebTorrent = require('webtorrent');
-const parseTorrent = require('parse-torrent');
+import WebTorrent from 'webtorrent';
+import parseTorrent from 'parse-torrent';
 import * as path from 'path';
 import { isImageFile, isVideoFile, } from '../utils/constants.js';
 import { ensureTmpDir } from '../utils/tg.js';

@@ -1,10 +1,10 @@
 import { Context } from 'grammy';
 /**
- * Handle incoming image messages — ask user what to do
+ * Handle incoming image messages — ask user what to do via inline buttons
  */
 export declare function handleImage(ctx: Context): Promise<void>;
 /**
- * Handle image action selection (reply with 1, 2, or 3)
+ * Handle image action from inline button callback
  */
-export declare function handleImageAction(ctx: Context, action: '1' | '2' | '3'): Promise<void>;
+export declare function handleImageAction(ctx: Context, action: string): Promise<void>;
 //# sourceMappingURL=image.d.ts.map
