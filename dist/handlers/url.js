@@ -148,23 +148,30 @@ async function handleMediaUrl(ctx, url, key, statusMsgId) {
     const downloadedItems = [];
     for (let i = 0; i < result.items.length; i++) {
         const item = result.items[i];
-        const ext = path.extname(new URL(item.url).pathname) || '.mp4';
-        const localPath = path.join(TMP_DIR, `platform_${Date.now()}_${i}${ext}`);
-        const resp = await fetch(item.url);
-        if (!resp.ok) {
-            throw new Error(`下载文件 ${i + 1} 失败 (HTTP ${resp.status})`);
+        let localPath;
+        // If the module already downloaded the file, use it directly
+        if (item.filePath && fs.existsSync(item.filePath)) {
+            localPath = item.filePath;
         }
-        const buffer = Buffer.from(await resp.arrayBuffer());
-        // Check size limit (50MB for bot)
-        if (buffer.length > TG_BOT_MAX_FILE_SIZE) {
-            // Still download others, but skip this one
-            await ctx.api.editMessageText(ctx.chat.id, statusMsgId, `⚠️ 文件 ${i + 1} 超过 50MB 限制，已跳过`);
-            continue;
+        else {
+            const ext = path.extname(new URL(item.url).pathname) || '.mp4';
+            localPath = path.join(TMP_DIR, `platform_${Date.now()}_${i}${ext}`);
+            const resp = await fetch(item.url);
+            if (!resp.ok) {
+                throw new Error(`下载文件 ${i + 1} 失败 (HTTP ${resp.status})`);
+            }
+            const buffer = Buffer.from(await resp.arrayBuffer());
+            // Check size limit (50MB for bot)
+            if (buffer.length > TG_BOT_MAX_FILE_SIZE) {
+                // Still download others, but skip this one
+                await ctx.api.editMessageText(ctx.chat.id, statusMsgId, `⚠️ 文件 ${i + 1} 超过 50MB 限制，已跳过`);
+                continue;
+            }
+            if (!fs.existsSync(TMP_DIR)) {
+                fs.mkdirSync(TMP_DIR, { recursive: true });
+            }
+            fs.writeFileSync(localPath, buffer);
         }
-        if (!fs.existsSync(TMP_DIR)) {
-            fs.mkdirSync(TMP_DIR, { recursive: true });
-        }
-        fs.writeFileSync(localPath, buffer);
         downloadedItems.push({ item, localPath });
     }
     // Delete the status message before sending media
