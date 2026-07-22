@@ -8,8 +8,21 @@
  */
 
 import * as fs from 'fs';
+import crypto from 'crypto';
 import { DownloadResult, MediaItem, DownloadOptions } from './downloader.js';
 import { tempFilePath } from '../utils/tg.js';
+
+const BILIBILI_UA =
+  'Mozilla/5.0 (Macintosh; Intel Mac OS X 10_15_7) ' +
+  'AppleWebKit/537.36 (KHTML, like Gecko) Chrome/120.0.0.0 Safari/537.36';
+
+function makeBuvid3(): string {
+  const hex = crypto.randomBytes(16).toString('hex');
+  const uuid = `${hex.slice(0, 8)}-${hex.slice(8, 12)}-${hex.slice(12, 16)}-${hex.slice(16, 20)}-${hex.slice(20, 32)}`;
+  return `${uuid}infoc`;
+}
+
+const BASE_COOKIE = `buvid3=${makeBuvid3()}; b_nut=${Math.floor(Date.now() / 1000)}; _uuid=${makeBuvid3()}`;
 
 // ─── Helpers ─────────────────────────────────────────────────────
 
@@ -50,10 +63,9 @@ async function downloadFile(
   const tmpPath = tempFilePath(`bilibili${ext}`);
   const response = await fetch(remoteUrl, {
     headers: {
-      'User-Agent':
-        'Mozilla/5.0 (Macintosh; Intel Mac OS X 10_15_7) ' +
-        'AppleWebKit/537.36 (KHTML, like Gecko) Chrome/120.0.0.0 Safari/537.36',
+      'User-Agent': BILIBILI_UA,
       Referer: 'https://www.bilibili.com/',
+      Cookie: BASE_COOKIE,
     },
   });
 
@@ -89,10 +101,9 @@ export async function downloadBilibili(
     const infoUrl = `https://api.bilibili.com/x/web-interface/view?bvid=${bvid}`;
     const infoResponse = await fetch(infoUrl, {
       headers: {
-        'User-Agent':
-          'Mozilla/5.0 (Macintosh; Intel Mac OS X 10_15_7) ' +
-          'AppleWebKit/537.36 (KHTML, like Gecko) Chrome/120.0.0.0 Safari/537.36',
+        'User-Agent': BILIBILI_UA,
         Referer: 'https://www.bilibili.com/',
+        Cookie: BASE_COOKIE,
       },
     });
 
@@ -121,10 +132,9 @@ export async function downloadBilibili(
     const playUrl = `https://api.bilibili.com/x/player/playurl?bvid=${bvid}&cid=${cid}&qn=80&platform=web&otype=json&high_quality=1`;
     const playResponse = await fetch(playUrl, {
       headers: {
-        'User-Agent':
-          'Mozilla/5.0 (Macintosh; Intel Mac OS X 10_15_7) ' +
-          'AppleWebKit/537.36 (KHTML, like Gecko) Chrome/120.0.0.0 Safari/537.36',
+        'User-Agent': BILIBILI_UA,
         Referer: 'https://www.bilibili.com/',
+        Cookie: BASE_COOKIE,
       },
     });
 
