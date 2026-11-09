@@ -10,7 +10,7 @@ A TypeScript Telegram bot with torrent downloads, media conversion, and image se
 | 🖼 Image | Convert to GIF, Google Lens search, Yandere reverse search |
 | 🎬 Video | Convert to GIF |
 | 🎞 GIF | Convert to video or extract frame |
-| 🔗 URL Fixer | Auto-fix x.com → fixupx.com & facebook.com → facebed.com links |
+| 🔗 URL Fixer | Auto-fix x.com → fixupx.com; Facebook video/photo download (facebed fallback) |
 | 📦 Smart ZIP | Compress >2GB folders automatically |
 
 ## Setup

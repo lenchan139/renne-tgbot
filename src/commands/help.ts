@@ -22,8 +22,12 @@ export async function helpCommand(ctx: Context) {
 
 **URL Fixer**
 • Send any \`x.com\` / \`twitter.com\` link → \`fixupx.com\`
-• Send any \`facebook.com\` link → \`facebed.com\`
 • In groups (admin): I edit the original message
+
+**Facebook**
+• Send a \`facebook.com\` / \`fb.watch\` post or video link
+• I'll download the video/photo and send it directly
+• If unavailable, I reply with the \`facebed.com\` embed link
 
 **Notes**
 • Torrent downloads show live progress

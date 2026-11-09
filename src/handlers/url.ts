@@ -4,8 +4,6 @@ import { isAdmin } from '../utils/tg.js';
 import {
   X_DOMAINS,
   X_FIXUP_DOMAIN,
-  FB_DOMAINS,
-  FB_FIXUP_DOMAIN,
   TMP_DIR,
   TG_BOT_MAX_FILE_SIZE,
 } from '../utils/constants.js';
@@ -81,36 +79,6 @@ export async function handleXUrl(ctx: Context) {
   await sendFixedUrl(ctx, text, fixedText);
 }
 
-/**
- * Handle facebook.com URL messages → facebed.com
- *
- * facebed is a drop-in embed mirror (like fixupx for X): replace the
- * host and keep the path/query intact.
- *   https://www.facebook.com/share/v/ABC/ → https://facebed.com/share/v/ABC/
- */
-export async function handleFacebookUrl(ctx: Context) {
-  const text = ctx.message?.text;
-  if (!text) return;
-
-  const urlRegex = new RegExp(
-    `(https?://(?:www\\.|m\\.|web\\.|mbasic\\.|mobile\\.)?(${FB_DOMAINS.join('|')})/[^\\s]+)`,
-    'gi'
-  );
-  const matches = text.match(urlRegex);
-  if (!matches || matches.length === 0) return;
-
-  let fixedText = text;
-  for (const url of matches) {
-    const fixupUrl = url.replace(
-      /https?:\/\/(?:www\.|m\.|web\.|mbasic\.|mobile\.)?facebook\.com/i,
-      `https://${FB_FIXUP_DOMAIN}`
-    );
-    fixedText = fixedText.replace(url, fixupUrl);
-  }
-
-  await sendFixedUrl(ctx, text, fixedText);
-}
-
 // ─── Platform URL handler (new) ───────────────────────────────
 
 interface PlatformModule {
@@ -120,6 +88,7 @@ interface PlatformModule {
   downloadDouyin?: (url: string, opts?: any) => Promise<DownloadResult>;
   downloadXiaohongshu?: (url: string, opts?: any) => Promise<DownloadResult>;
   downloadTiktok?: (url: string, opts?: any) => Promise<DownloadResult>;
+  downloadFacebook?: (url: string, opts?: any) => Promise<DownloadResult>;
   processWechatArticle?: (url: string) => Promise<any>;
 }
 
@@ -130,6 +99,7 @@ const platformModules: Record<string, () => Promise<PlatformModule>> = {
   tiktok: () => import('../modules/tiktok.js'),
   weibo: () => import('../modules/weibo.js'),
   bilibili: () => import('../modules/bilibili.js'),
+  facebook: () => import('../modules/facebook.js'),
   wechat: () => import('../modules/wechat.js'),
 };
 
@@ -140,6 +110,7 @@ const moduleDownloadFn: Record<string, string> = {
   tiktok: 'downloadTiktok',
   weibo: 'downloadWeibo',
   bilibili: 'downloadBilibili',
+  facebook: 'downloadFacebook',
 };
 
 const platformNameMap: Record<string, string> = {
@@ -149,6 +120,7 @@ const platformNameMap: Record<string, string> = {
   tiktok: 'TikTok',
   weibo: '微博',
   bilibili: 'Bilibili',
+  facebook: 'Facebook',
   wechat: '微信公众号',
 };
 
@@ -191,6 +163,8 @@ export async function handlePlatformUrl(ctx: Context): Promise<void> {
   try {
     if (key === 'wechat') {
       await handleWechatUrl(ctx, url, statusMsg.message_id);
+    } else if (key === 'facebook') {
+      await handleFacebookMediaUrl(ctx, url, statusMsg.message_id);
     } else {
       await handleMediaUrl(ctx, url, key, statusMsg.message_id);
     }
@@ -201,6 +175,32 @@ export async function handlePlatformUrl(ctx: Context): Promise<void> {
       statusMsg.message_id,
       `❌ 处理失败：${errorText}`
     );
+  }
+}
+
+/**
+ * Facebook: try to download media and send it natively. When the post has
+ * no downloadable media (or Facebook blocks it), fall back to the
+ * facebed.com embed link.
+ */
+async function handleFacebookMediaUrl(
+  ctx: Context,
+  url: string,
+  statusMsgId: number
+): Promise<void> {
+  try {
+    await handleMediaUrl(ctx, url, 'facebook', statusMsgId);
+  } catch (err) {
+    const { toFacebedUrl } = await import('../modules/facebook.js');
+    const fixed = toFacebedUrl(url);
+
+    if (!fixed || fixed === url) throw err;
+
+    // Remove the status message and reply with the embed link instead
+    await ctx.api.deleteMessage(ctx.chat!.id, statusMsgId).catch(() => {});
+    await ctx.reply(fixed, {
+      reply_parameters: { message_id: ctx.message!.message_id },
+    });
   }
 }
 
@@ -358,6 +358,7 @@ const platformDomainMap: Record<string, string[]> = {
   tiktok: ['vt.tiktok.com', 'tiktok.com', 'vm.tiktok.com'],
   weibo: ['weibo.com', 'm.weibo.cn', 'weibo.cn'],
   bilibili: ['bilibili.com', 'b23.tv'],
+  facebook: ['facebook.com', 'fb.watch', 'fb.com', 'facebed.com'],
   wechat: ['mp.weixin.qq.com'],
 };
 

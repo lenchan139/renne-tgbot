@@ -6,11 +6,7 @@ import { btCommand } from './commands/bt.js';
 import { handleImage, handleImageAction } from './handlers/image.js';
 import { handleVideo, handleVideoAction } from './handlers/video.js';
 import { handleGif, handleGifAction } from './handlers/gif.js';
-import {
-  handleXUrl,
-  handleFacebookUrl,
-  handlePlatformUrl,
-} from './handlers/url.js';
+import { handleXUrl, handlePlatformUrl } from './handlers/url.js';
 import {
   handleTorrentFile,
   handleMagnetLink,
@@ -57,13 +53,8 @@ bot.on('message', async (ctx) => {
     return handleXUrl(ctx);
   }
 
-  // 3b. facebook.com URL → facebed.com
-  if (text && /facebook\.com/i.test(text)) {
-    return handleFacebookUrl(ctx);
-  }
-
-  // 4. Platform media URLs (Threads, 小红书, 抖音, TikTok, 微博, Bilibili, 微信)
-  if (text && /(threads\.net|xhslink\.com|xiaohongshu\.com|v\.douyin\.com|douyin\.com|vt\.tiktok\.com|tiktok\.com|vm\.tiktok\.com|weibo\.com|m\.weibo\.cn|weibo\.cn|bilibili\.com|b23\.tv|mp\.weixin\.qq\.com)/i.test(text)) {
+  // 4. Platform media URLs (Threads, 小红书, 抖音, TikTok, 微博, Bilibili, Facebook, 微信)
+  if (text && /(threads\.net|xhslink\.com|xiaohongshu\.com|v\.douyin\.com|douyin\.com|vt\.tiktok\.com|tiktok\.com|vm\.tiktok\.com|weibo\.com|m\.weibo\.cn|weibo\.cn|bilibili\.com|b23\.tv|facebook\.com|fb\.watch|fb\.com|facebed\.com|mp\.weixin\.qq\.com)/i.test(text)) {
     return handlePlatformUrl(ctx);
   }
 
