@@ -22,6 +22,8 @@ export interface MediaItem {
   duration?: number;
   /** Thumbnail remote URL */
   thumbnail?: string;
+  /** Optional caption to attach when sending the media */
+  caption?: string;
 }
 
 // ─── Download result ──────────────────────────────────────────

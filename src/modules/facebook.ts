@@ -32,6 +32,17 @@ export function toFacebedUrl(url: string): string {
   );
 }
 
+/** Build a caption from the post metadata (Telegram limit ≈ 1024 chars). */
+function buildCaption(title: string, description: string, link: string): string {
+  const parts: string[] = [];
+  if (title) parts.push(title);
+  if (description) parts.push(description);
+  parts.push(`🔗 ${link}`);
+
+  const text = parts.join('\n\n');
+  return text.length > 1000 ? `${text.slice(0, 997)}…` : text;
+}
+
 /**
  * Resolve fb.watch / fb.com short links to their canonical facebook.com URL.
  */
@@ -97,6 +108,10 @@ export async function downloadFacebook(
     const html = await res.text();
     const $ = cheerio.load(html);
 
+    // Caption metadata: author/title + post text + the facebed link
+    const authorTitle = ($('meta[property="og:title"]').attr('content') || '').trim();
+    const postText = ($('meta[property="og:description"]').attr('content') || '').trim();
+
     // 2. Collect media URLs (og:video:secure_url duplicates og:video)
     const videoUrls = new Set<string>();
     const imageUrls = new Set<string>();
@@ -149,7 +164,16 @@ export async function downloadFacebook(
 
         const filePath = tempFilePath(`facebook${ext}`);
         fs.writeFileSync(filePath, buffer);
-        items.push({ type: m.type, url: m.url, filePath });
+        items.push({
+          type: m.type,
+          url: m.url,
+          filePath,
+          // Attach the caption to the first item only, so it isn't repeated
+          caption:
+            items.length === 0
+              ? buildCaption(authorTitle, postText, embedUrl)
+              : undefined,
+        });
       } catch {
         // Skip this item and continue with the rest
       }

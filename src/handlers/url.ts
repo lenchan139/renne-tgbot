@@ -334,10 +334,12 @@ async function handleMediaUrl(
           width: item.width,
           height: item.height,
           duration: item.duration,
+          caption: item.caption,
         });
       } else {
         await ctx.replyWithPhoto(file, {
           reply_parameters: { message_id: ctx.message!.message_id },
+          caption: item.caption,
         });
       }
     } catch (err) {
