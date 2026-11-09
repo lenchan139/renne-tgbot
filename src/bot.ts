@@ -23,6 +23,11 @@ if (!token) {
 
 const bot = new Bot(token);
 
+/** SNS / platform URLs that the bot turns into fixed links or media previews. */
+const X_URL_RE = /\b(x\.com|twitter\.com)\b/i;
+const PLATFORM_URL_RE =
+  /(threads\.net|xhslink\.com|xiaohongshu\.com|v\.douyin\.com|douyin\.com|vt\.tiktok\.com|tiktok\.com|vm\.tiktok\.com|weibo\.com|m\.weibo\.cn|weibo\.cn|bilibili\.com|b23\.tv|facebook\.com|fb\.watch|fb\.com|facebed\.com|mp\.weixin\.qq\.com)/i;
+
 // ─── Command handlers ───────────────────────────────────────
 
 bot.command('start', startCommand);
@@ -34,6 +39,22 @@ bot.command('bt', btCommand);
 bot.on('message', async (ctx) => {
   const msg = ctx.message;
   const text = msg.text || '';
+  const isGroup = ctx.chat?.type === 'group' || ctx.chat?.type === 'supergroup';
+
+  // ─── Groups: only auto-handle SNS links / previews ───────────
+  // Torrents, images, videos and GIFs are ignored in groups.
+  // (Commands such as /bt still work via the handlers above.)
+  if (isGroup) {
+    if (text && X_URL_RE.test(text)) {
+      return handleXUrl(ctx);
+    }
+    if (text && PLATFORM_URL_RE.test(text)) {
+      return handlePlatformUrl(ctx);
+    }
+    return;
+  }
+
+  // ─── Private chats: full feature set ─────────────────────────
 
   // 1. Document (torrent file)
   if (msg.document) {
@@ -49,12 +70,12 @@ bot.on('message', async (ctx) => {
   }
 
   // 3. x.com / twitter.com URL
-  if (text && /(x\.com|twitter\.com)/i.test(text)) {
+  if (text && X_URL_RE.test(text)) {
     return handleXUrl(ctx);
   }
 
   // 4. Platform media URLs (Threads, 小红书, 抖音, TikTok, 微博, Bilibili, Facebook, 微信)
-  if (text && /(threads\.net|xhslink\.com|xiaohongshu\.com|v\.douyin\.com|douyin\.com|vt\.tiktok\.com|tiktok\.com|vm\.tiktok\.com|weibo\.com|m\.weibo\.cn|weibo\.cn|bilibili\.com|b23\.tv|facebook\.com|fb\.watch|fb\.com|facebed\.com|mp\.weixin\.qq\.com)/i.test(text)) {
+  if (text && PLATFORM_URL_RE.test(text)) {
     return handlePlatformUrl(ctx);
   }
 
@@ -77,6 +98,12 @@ bot.on('message', async (ctx) => {
 // ─── Callback query handlers (inline buttons) ─────────────────
 
 bot.callbackQuery(/^(img|vid|gif)_/, async (ctx) => {
+  // Media conversions are private-chat only
+  if (ctx.chat?.type === 'group' || ctx.chat?.type === 'supergroup') {
+    await ctx.answerCallbackQuery().catch(() => {});
+    return;
+  }
+
   const data = ctx.callbackQuery?.data;
   if (!data) return;
 

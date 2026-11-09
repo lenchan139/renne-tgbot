@@ -33,7 +33,7 @@ export async function helpCommand(ctx: Context) {
 • Torrent downloads show live progress
 • Files > 2 GB are compressed as ZIP
 • Images sent as 2 copies: compressed + uncompressed
-• Works in PM and groups`;
+• PM: all features — groups: SNS links/previews only`;
 
   await ctx.reply(text, { parse_mode: 'Markdown' });
 }
