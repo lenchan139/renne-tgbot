@@ -80,146 +80,91 @@ src/
 - ffmpeg (for video/gif conversion)
 - Telegram Bot Token
 
-## Production Deployment
+## Production Deployment (Docker)
 
-This project uses a **two-branch workflow**:
-
-| Branch | Purpose |
-|--------|---------|
-| `main` | TypeScript source code |
-| `_pm2_prod_run` | Compiled JS + production runner |
-
-### How It Works
+The bot ships as a Docker image on **GitHub Container Registry (GHCR)**.
+Every push to `main` builds and publishes `ghcr.io/lenchan139/renne-tgbot:latest`
+(plus `sha-<short>` and branch tags). The image is `linux/amd64`, matching
+Intel/AMD Synology NAS models.
 
 ```mermaid
 flowchart LR
-    A[Push to main] --> B[GitHub Action]
-    B --> C[npm ci + tsc]
-    C --> D[Prune devDeps]
-    D --> E[Push to _pm2_prod_run]
-    E --> F[Server: update-checker detects]
-    F --> G[git pull + npm ci]
-    G --> H[pm2 restart renne-tgbot]
+    A[Push to main] --> B[GitHub Actions]
+    B --> C[docker build linux/amd64]
+    C --> D[Push to ghcr.io]
+    D --> E[NAS: scheduled nas-update.sh]
+    E --> F[docker compose pull + up -d]
 ```
 
-1. Push to `main` → GitHub Action compiles TS, pushes artifacts to `_pm2_prod_run`
-2. On the server, `renne-updater` (pm2) polls `_pm2_prod_run` every 60s
-3. If new commit detected → `git pull` → `npm ci` → `pm2 restart renne-tgbot`
+### 1. Make the GHCR package visible (one-time)
 
-### Initial Server Setup (Synology NAS)
+The workflow uses the built-in `GITHUB_TOKEN` with `packages: write`, so no
+extra secrets are needed. By default the package is **private** — either:
 
-**1. Install DSM packages**
+- Keep it private and log in on the NAS first:
+  ```bash
+  echo <YOUR_GITHUB_PAT> | docker login ghcr.io -u lenchan139 --password-stdin
+  ```
+  (PAT needs the `read:packages` scope.)
+- Or, in GitHub → **Packages → renne-tgbot → Package settings**, change the
+  visibility to **Public** so the NAS can pull without credentials.
 
-Open **Package Center** → Install:
-- **Git Server** (or just Git)
-- **Node.js** (via Synology Package Center — look for v18+)
+### 2. Deploy on the Synology NAS
 
-If Node.js isn't available in Package Center, use [SynoCommunity](https://synocommunity.com/):
-```bash
-# Add SynoCommunity package source in Package Center
-# Then install Node.js and ffmpeg from there
-```
-
-**2. Install ffmpeg**
-
-Option A — SynoCommunity (recommended):
-- Install `ffmpeg` package from SynoCommunity
-
-Option B — Manual:
-```bash
-cd /tmp
-wget https://johnvansickle.com/ffmpeg/releases/ffmpeg-release-amd64-static.tar.xz
-tar xf ffmpeg-release-amd64-static.tar.xz
-sudo cp ffmpeg-*/ffmpeg /usr/local/bin/
-sudo cp ffmpeg-*/ffprobe /usr/local/bin/
-```
-
-Verify:
-```bash
-ffmpeg -version | head -1
-```
-
-**3. SSH into your NAS and clone the production branch**
+Create the project directory and copy the compose files
+(`docker-compose.yml`, `.env`, `scripts/nas-update.sh`) to the NAS, e.g.
+`/volume1/docker/renne-tgbot`, then:
 
 ```bash
-ssh admin@your-nas-ip
+cd /volume1/docker/renne-tgbot
 
-# Create directory
-mkdir -p /volume1/docker/renne-bot
+# Create .env with your token
+cp .env.example .env   # or create it manually
+vi .env                # BOT_TOKEN=..., TELEGRAPH_TOKEN=...
 
-# Clone production branch (contains compiled JS + runner)
-git clone -b _pm2_prod_run https://github.com/lenchan139/renne-tgbot.git /volume1/docker/renne-bot
-cd /volume1/docker/renne-bot
+docker compose pull
+docker compose up -d
+docker compose logs -f
 ```
 
-**4. Configure environment**
+> The bot reads `BOT_TOKEN` / `TELEGRAPH_TOKEN` from the environment
+> (`env_file: .env`). No secrets are baked into the image.
+
+### 3. Automatic updates (Task Scheduler)
+
+`scripts/nas-update.sh` pulls the latest image and recreates the container
+without touching your `.env` or the temp volume.
+
+In DSM: **Control Panel → Task Scheduler → Create → Scheduled Task**, with:
+
+| Field | Value |
+|-------|-------|
+| User | `root` (required for docker) |
+| Schedule | Every 30 minutes (or hourly) |
+| Command | `/volume1/docker/renne-tgbot/scripts/nas-update.sh` |
+
+The script's output is appended to `/volume1/docker/renne-tgbot/update.log`.
+
+### Useful commands
 
 ```bash
-# Create .env from example
-cp .env.example .env
-
-# Edit with vi (nano may not be available on DSM)
-vi .env
+docker compose ps                 # container status
+docker compose logs -f            # live logs
+docker compose pull && docker compose up -d   # manual update
+docker compose down               # stop & remove container
 ```
 
-`.env` contents:
-```
-BOT_TOKEN=your_telegram_bot_token_here
-```
+### Image tags
 
-> Get a bot token from [@BotFather](https://t.me/BotFather)
+| Tag | Built when |
+|-----|-----------|
+| `latest` | push to `main` |
+| `main` | push to `main` |
+| `sha-<short>` | every build (pinned commit) |
+| `1.2.3` / `1.2` | push a `v1.2.3` git tag |
 
-**5. Run the bootstrap script**
+> **Note:** the previous pm2 / `_pm2_prod_run` deployment flow has been removed
+> in favour of Docker. Legacy helpers (`ecosystem/`, `scripts/prod-start.sh`,
+> `scripts/update-checker.cjs`) are kept only for reference and are no longer
+> wired to CI.
 
-```bash
-bash scripts/prod-start.sh
-```
-
-This will:
-- Install pm2 globally (if missing)
-- Install production npm dependencies
-- Start both `renne-tgbot` and `renne-updater` processes
-
-**6. Verify everything is running**
-
-```bash
-pm2 status
-```
-
-You should see:
-```
-renne-tgbot   ● online  0s  0 MB  enabled
-renne-updater ● online  0s  0 MB  enabled
-```
-
----
-
-### What happens after setup?
-
-- The **bot** runs continuously and responds to Telegram messages
-- The **updater** checks `_pm2_prod_run` branch every 60 seconds
-- When you push to `main`, GitHub Actions builds and pushes to `_pm2_prod_run`
-- The updater detects the new commit, pulls it, runs `npm ci`, and restarts the bot
-- **Zero manual intervention** required for updates
-
----
-
-### Server Requirements (Synology)
-
-| Requirement | How to Install |
-|-------------|---------------|
-| Node.js ≥ 18 | Package Center or [SynoCommunity](https://synocommunity.com/) |
-| ffmpeg | SynoCommunity package or [johnvansickle static build](https://johnvansickle.com/ffmpeg/) |
-| Git | DSM Package Center → Git Server |
-| pm2 | auto-installed by `prod-start.sh` |
-
-### Useful Commands
-
-```bash
-pm2 status              # Check process status
-pm2 logs                # View live logs
-pm2 logs renne-tgbot    # Bot logs only
-pm2 logs renne-updater  # Updater logs only
-pm2 restart all          # Restart everything
-pm2 stop all            # Stop everything
-```

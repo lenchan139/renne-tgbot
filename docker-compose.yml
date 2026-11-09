@@ -1,0 +1,28 @@
+# Renne TGBot — Synology / Docker Compose deployment
+#
+# Usage (on the NAS, in this directory):
+#   docker compose pull
+#   docker compose up -d
+#
+# `.env` must exist next to this file with BOT_TOKEN (and optionally TELEGRAPH_TOKEN).
+
+services:
+  renne-tgbot:
+    image: ghcr.io/lenchan139/renne-tgbot:latest
+    container_name: renne-tgbot
+    restart: unless-stopped
+    env_file:
+      - .env
+    volumes:
+      # Scratch space for torrent chunks / media conversions
+      - renne-tmp:/tmp/renne-bot
+    security_opt:
+      - no-new-privileges:true
+    logging:
+      driver: json-file
+      options:
+        max-size: "10m"
+        max-file: "3"
+
+volumes:
+  renne-tmp:

@@ -1,0 +1,32 @@
+# Dependencies (installed inside the image)
+node_modules/
+npm-debug.log*
+
+# Build output (rebuilt inside the image)
+dist/
+
+# Git / CI
+.git/
+.github/
+
+# Local config & secrets
+.env
+.env.*
+!.env.example
+
+# Runtime artifacts
+logs/
+*.log
+tmp/
+_prod/
+_deploy/
+
+# Dev / editor
+.opencode/
+.vscode/
+.idea/
+.DS_Store
+Thumbs.db
+
+# Docs / misc
+*.md
