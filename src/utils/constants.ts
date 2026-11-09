@@ -12,6 +12,10 @@ export const TMP_DIR = '/tmp/renne-bot';
 export const X_DOMAINS = ['x.com', 'twitter.com'];
 export const X_FIXUP_DOMAIN = 'fixupx.com';
 
+/** Facebook → facebed.com embed-friendly replacement */
+export const FB_DOMAINS = ['facebook.com'];
+export const FB_FIXUP_DOMAIN = 'facebed.com';
+
 /**
  * Platform download domains — used in url.ts routing.
  * Each entry maps the display name to the URL pattern prefix.

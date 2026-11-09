@@ -21,8 +21,8 @@ export async function helpCommand(ctx: Context) {
 • **Extract Frame** — GIF → PNG
 
 **URL Fixer**
-• Send any \`x.com\` or \`twitter.com\` link
-• I'll reply with \`fixupx.com\` version
+• Send any \`x.com\` / \`twitter.com\` link → \`fixupx.com\`
+• Send any \`facebook.com\` link → \`facebed.com\`
 • In groups (admin): I edit the original message
 
 **Notes**

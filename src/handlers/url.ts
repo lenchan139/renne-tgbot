@@ -4,6 +4,8 @@ import { isAdmin } from '../utils/tg.js';
 import {
   X_DOMAINS,
   X_FIXUP_DOMAIN,
+  FB_DOMAINS,
+  FB_FIXUP_DOMAIN,
   TMP_DIR,
   TG_BOT_MAX_FILE_SIZE,
 } from '../utils/constants.js';
@@ -15,11 +17,45 @@ import {
 import fs from 'fs';
 import path from 'path';
 
-// ─── X/Twitter handler (existing, unchanged) ──────────────────
+// ─── URL fixup handlers (X/Twitter, Facebook) ────────────────
 
 /**
- * Handle x.com / twitter.com URL messages
- * - In PM: reply with fixupx.com URL
+ * Reply with the fixed text, or (in a group, when the sender is an
+ * admin) edit the original message in place.
+ */
+async function sendFixedUrl(
+  ctx: Context,
+  originalText: string,
+  fixedText: string
+): Promise<void> {
+  if (fixedText === originalText) return;
+
+  const isGroup = ctx.chat?.type === 'group' || ctx.chat?.type === 'supergroup';
+
+  if (isGroup) {
+    const admin = await isAdmin(ctx);
+    if (admin && ctx.message?.message_id) {
+      try {
+        await ctx.api.editMessageText(
+          ctx.chat!.id,
+          ctx.message.message_id,
+          fixedText
+        );
+        return;
+      } catch {
+        // If edit fails, fall back to reply
+      }
+    }
+  }
+
+  await ctx.reply(fixedText, {
+    reply_parameters: { message_id: ctx.message!.message_id },
+  });
+}
+
+/**
+ * Handle x.com / twitter.com URL messages → fixupx.com
+ * - In PM: reply with the fixed URL
  * - In group with admin: edit the original message
  */
 export async function handleXUrl(ctx: Context) {
@@ -33,38 +69,46 @@ export async function handleXUrl(ctx: Context) {
   const matches = text.match(urlRegex);
   if (!matches || matches.length === 0) return;
 
-  let replacedText = text;
+  let fixedText = text;
   for (const url of matches) {
     const fixupUrl = url.replace(
       /https?:\/\/(?:www\.)?(x\.com|twitter\.com)/i,
       `https://${X_FIXUP_DOMAIN}`
     );
-    replacedText = replacedText.replace(url, fixupUrl);
+    fixedText = fixedText.replace(url, fixupUrl);
   }
 
-  const isGroup = ctx.chat?.type === 'group' || ctx.chat?.type === 'supergroup';
+  await sendFixedUrl(ctx, text, fixedText);
+}
 
-  if (isGroup) {
-    const admin = await isAdmin(ctx);
-    if (admin && ctx.message?.message_id) {
-      try {
-        await ctx.api.editMessageText(
-          ctx.chat!.id,
-          ctx.message.message_id,
-          replacedText
-        );
-        return;
-      } catch {
-        // If edit fails, fall back to reply
-      }
-    }
+/**
+ * Handle facebook.com URL messages → facebed.com
+ *
+ * facebed is a drop-in embed mirror (like fixupx for X): replace the
+ * host and keep the path/query intact.
+ *   https://www.facebook.com/share/v/ABC/ → https://facebed.com/share/v/ABC/
+ */
+export async function handleFacebookUrl(ctx: Context) {
+  const text = ctx.message?.text;
+  if (!text) return;
+
+  const urlRegex = new RegExp(
+    `(https?://(?:www\\.|m\\.|web\\.|mbasic\\.|mobile\\.)?(${FB_DOMAINS.join('|')})/[^\\s]+)`,
+    'gi'
+  );
+  const matches = text.match(urlRegex);
+  if (!matches || matches.length === 0) return;
+
+  let fixedText = text;
+  for (const url of matches) {
+    const fixupUrl = url.replace(
+      /https?:\/\/(?:www\.|m\.|web\.|mbasic\.|mobile\.)?facebook\.com/i,
+      `https://${FB_FIXUP_DOMAIN}`
+    );
+    fixedText = fixedText.replace(url, fixupUrl);
   }
 
-  if (replacedText !== text) {
-    await ctx.reply(replacedText, {
-      reply_parameters: { message_id: ctx.message!.message_id },
-    });
-  }
+  await sendFixedUrl(ctx, text, fixedText);
 }
 
 // ─── Platform URL handler (new) ───────────────────────────────
