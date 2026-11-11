@@ -1,5 +1,4 @@
-import { Context } from 'grammy';
-import { InputFile } from 'grammy';
+import { Context, InputFile, InputMediaBuilder } from 'grammy';
 import { isAdmin } from '../utils/tg.js';
 import {
   X_DOMAINS,
@@ -323,30 +322,105 @@ async function handleMediaUrl(
   // Delete the status message before sending media
   await ctx.api.deleteMessage(ctx.chat!.id, statusMsgId).catch(() => {});
 
-  // Send each file
-  for (const { item, localPath } of downloadedItems) {
-    try {
-      const file = new InputFile(localPath);
-
-      if (item.type === 'video') {
-        await ctx.replyWithVideo(file, {
-          reply_parameters: { message_id: ctx.message!.message_id },
-          width: item.width,
-          height: item.height,
-          duration: item.duration,
-          caption: item.caption,
-        });
-      } else {
-        await ctx.replyWithPhoto(file, {
-          reply_parameters: { message_id: ctx.message!.message_id },
-          caption: item.caption,
-        });
-      }
-    } catch (err) {
-      console.error(`Failed to send ${localPath}:`, err);
-    } finally {
-      // Clean up each file after sending
+  try {
+    await sendDownloadedMedia(ctx, downloadedItems);
+  } finally {
+    // Clean up all files after sending
+    for (const { localPath } of downloadedItems) {
       try { fs.unlinkSync(localPath); } catch {}
+    }
+  }
+}
+
+// ─── Media sending ───────────────────────────────────────────
+
+/** Telegram albums allow at most 10 items. */
+const MAX_MEDIA_PER_GROUP = 10;
+
+function isVideoLike(item: MediaItem): boolean {
+  return item.type === 'video' || item.type === 'animation';
+}
+
+/** Send a single photo/video with its caption. */
+async function sendSingleMedia(
+  ctx: Context,
+  item: MediaItem,
+  localPath: string,
+  replyTo: number
+): Promise<void> {
+  const file = new InputFile(localPath);
+
+  if (isVideoLike(item)) {
+    await ctx.replyWithVideo(file, {
+      reply_parameters: { message_id: replyTo },
+      width: item.width,
+      height: item.height,
+      duration: item.duration,
+      caption: item.caption,
+    });
+  } else {
+    await ctx.replyWithPhoto(file, {
+      reply_parameters: { message_id: replyTo },
+      caption: item.caption,
+    });
+  }
+}
+
+/**
+ * Send downloaded media, batching multiple items into Telegram albums
+ * (media groups, up to 10 per message). Falls back to individual sends
+ * if an album fails.
+ */
+async function sendDownloadedMedia(
+  ctx: Context,
+  items: { item: MediaItem; localPath: string }[]
+): Promise<void> {
+  const replyTo = ctx.message!.message_id;
+
+  for (let start = 0; start < items.length; start += MAX_MEDIA_PER_GROUP) {
+    const chunk = items.slice(start, start + MAX_MEDIA_PER_GROUP);
+
+    // A single item cannot be a media group
+    if (chunk.length === 1) {
+      const { item, localPath } = chunk[0];
+      try {
+        await sendSingleMedia(ctx, item, localPath, replyTo);
+      } catch (err) {
+        console.error(`Failed to send ${localPath}:`, err);
+      }
+      continue;
+    }
+
+    try {
+      const media = chunk.map(({ item, localPath }, idx) => {
+        // Keep the caption on the first item only
+        const caption = idx === 0 ? item.caption : undefined;
+
+        if (isVideoLike(item)) {
+          return InputMediaBuilder.video(new InputFile(localPath), {
+            width: item.width,
+            height: item.height,
+            duration: item.duration,
+            supports_streaming: true,
+            caption,
+          });
+        }
+
+        return InputMediaBuilder.photo(new InputFile(localPath), { caption });
+      });
+
+      await ctx.replyWithMediaGroup(media, {
+        reply_parameters: { message_id: replyTo },
+      });
+    } catch (err) {
+      console.error('Failed to send media group, falling back:', err);
+      for (const { item, localPath } of chunk) {
+        try {
+          await sendSingleMedia(ctx, item, localPath, replyTo);
+        } catch (e) {
+          console.error(`Failed to send ${localPath}:`, e);
+        }
+      }
     }
   }
 }
