@@ -16,6 +16,7 @@ import * as cheerio from 'cheerio';
 import { DownloadResult, MediaItem, DownloadOptions } from './downloader.js';
 import { tempFilePath } from '../utils/tg.js';
 import { FB_FIXUP_DOMAIN, TG_BOT_MAX_FILE_SIZE } from '../utils/constants.js';
+import { buildCaption } from '../utils/caption.js';
 
 const BROWSER_UA =
   'Mozilla/5.0 (Macintosh; Intel Mac OS X 10_15_7) ' +
@@ -30,17 +31,6 @@ export function toFacebedUrl(url: string): string {
     /https?:\/\/(?:www\.|m\.|web\.|mbasic\.|mobile\.)?facebook\.com/i,
     `https://${FB_FIXUP_DOMAIN}`
   );
-}
-
-/** Build a caption from the post metadata (Telegram limit ≈ 1024 chars). */
-function buildCaption(title: string, description: string, link: string): string {
-  const parts: string[] = [];
-  if (title) parts.push(title);
-  if (description) parts.push(description);
-  parts.push(`🔗 ${link}`);
-
-  const text = parts.join('\n\n');
-  return text.length > 1000 ? `${text.slice(0, 997)}…` : text;
 }
 
 /**
@@ -171,7 +161,7 @@ export async function downloadFacebook(
           // Attach the caption to the first item only, so it isn't repeated
           caption:
             items.length === 0
-              ? buildCaption(authorTitle, postText, embedUrl)
+              ? buildCaption([authorTitle, postText, `🔗 ${embedUrl}`])
               : undefined,
         });
       } catch {

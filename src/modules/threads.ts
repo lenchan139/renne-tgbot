@@ -3,6 +3,7 @@ import * as fs from 'fs';
 import * as path from 'path';
 import { DownloadResult, MediaItem, DownloadOptions } from './downloader.js';
 import { tempFilePath } from '../utils/tg.js';
+import { buildCaption } from '../utils/caption.js';
 
 const USER_AGENT =
   'Mozilla/5.0 (Macintosh; Intel Mac OS X 10_15_7) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/125.0.0.0 Safari/537.36';
@@ -31,9 +32,13 @@ export async function downloadThreads(
     const $ = cheerio.load(html);
     const mediaItems: MediaItem[] = [];
 
-    // 2. Extract og:image and og:video meta tags
+    // 2. Extract og:image / og:video / caption metadata
     const ogImage = $('meta[property="og:image"]').attr('content');
     const ogVideo = $('meta[property="og:video"]').attr('content');
+    const ogTitle = ($('meta[property="og:title"]').attr('content') || '').trim();
+    const ogDescription = (
+      $('meta[property="og:description"]').attr('content') || ''
+    ).trim();
 
     // 3. Parse JSON-LD script tag for carousel items
     const jsonLdScripts: string[] = [];
@@ -140,7 +145,15 @@ export async function downloadThreads(
         const buffer = Buffer.from(await dlResponse.arrayBuffer());
         fs.writeFileSync(filePath, buffer);
 
-        downloadedItems.push({ ...item, filePath });
+        downloadedItems.push({
+          ...item,
+          filePath,
+          // Attach the caption to the first item only
+          caption:
+            downloadedItems.length === 0
+              ? buildCaption([ogTitle, ogDescription, `🔗 ${url}`])
+              : undefined,
+        });
       } catch (dlErr) {
         options?.onProgress?.(0, `Download failed for ${item.url}`);
         // Continue with remaining items
