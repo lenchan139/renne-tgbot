@@ -75,17 +75,30 @@ bot.on('message', async (ctx) => {
   const text = msg.text || '';
   const isGroup = ctx.chat?.type === 'group' || ctx.chat?.type === 'supergroup';
 
-  // ─── Groups: only react when @mentioned or replied to ────────
-  // Otherwise ignore (no torrents, images, videos, GIFs or bare links).
+  // ─── Groups ──────────────────────────────────────────────────
+  // SNS links/previews are handled automatically. Everything else
+  // (image/video/GIF menus) only responds when the bot is @mentioned
+  // or replied to. Torrents are ignored in groups.
   // (Commands such as /bt still work via the handlers above.)
   if (isGroup) {
-    if (!isDirectedAtBot(ctx)) return;
-
     if (text && X_URL_RE.test(text)) {
       return handleXUrl(ctx);
     }
     if (text && PLATFORM_URL_RE.test(text)) {
       return handlePlatformUrl(ctx);
+    }
+
+    // Non-link media menus only when explicitly addressed
+    if (!isDirectedAtBot(ctx)) return;
+
+    if (msg.photo) {
+      return handleImage(ctx);
+    }
+    if (msg.video) {
+      return handleVideo(ctx);
+    }
+    if (msg.animation) {
+      return handleGif(ctx);
     }
     return;
   }
@@ -134,12 +147,6 @@ bot.on('message', async (ctx) => {
 // ─── Callback query handlers (inline buttons) ─────────────────
 
 bot.callbackQuery(/^(img|vid|gif)_/, async (ctx) => {
-  // Media conversions are private-chat only
-  if (ctx.chat?.type === 'group' || ctx.chat?.type === 'supergroup') {
-    await ctx.answerCallbackQuery().catch(() => {});
-    return;
-  }
-
   const data = ctx.callbackQuery?.data;
   if (!data) return;
 
