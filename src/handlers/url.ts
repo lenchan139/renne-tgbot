@@ -14,11 +14,47 @@ import {
 import fs from 'fs';
 import path from 'path';
 
-// ─── URL fixup handlers (X/Twitter, Facebook) ────────────────
+// ─── Shared helpers ──────────────────────────────────────────
+
+function isGroupChat(ctx: Context): boolean {
+  return ctx.chat?.type === 'group' || ctx.chat?.type === 'supergroup';
+}
+
+/** True when Telegram reports that the replied/edited message no longer exists. */
+function isMessageGone(err: unknown): boolean {
+  const message = err instanceof Error ? err.message : String(err);
+  return /message to (?:be replied|reply|edit) not found|message to edit not found|message_id_invalid|reply message not found/i.test(
+    message
+  );
+}
+
+/** Edit the progress message if we have one (groups run without one). */
+async function editStatus(
+  ctx: Context,
+  statusMsgId: number | undefined,
+  text: string,
+  extra?: any
+): Promise<void> {
+  if (statusMsgId === undefined) return;
+  await ctx.api
+    .editMessageText(ctx.chat!.id, statusMsgId, text, extra)
+    .catch(() => {});
+}
+
+async function deleteStatus(
+  ctx: Context,
+  statusMsgId: number | undefined
+): Promise<void> {
+  if (statusMsgId === undefined) return;
+  await ctx.api.deleteMessage(ctx.chat!.id, statusMsgId).catch(() => {});
+}
+
+// ─── URL fixup handler (X/Twitter) ───────────────────────────
 
 /**
  * Reply with the fixed text, or (in a group, when the sender is an
  * admin) edit the original message in place.
+ * If the original message was deleted, do nothing.
  */
 async function sendFixedUrl(
   ctx: Context,
@@ -27,9 +63,7 @@ async function sendFixedUrl(
 ): Promise<void> {
   if (fixedText === originalText) return;
 
-  const isGroup = ctx.chat?.type === 'group' || ctx.chat?.type === 'supergroup';
-
-  if (isGroup) {
+  if (isGroupChat(ctx)) {
     const admin = await isAdmin(ctx);
     if (admin && ctx.message?.message_id) {
       try {
@@ -39,15 +73,21 @@ async function sendFixedUrl(
           fixedText
         );
         return;
-      } catch {
-        // If edit fails, fall back to reply
+      } catch (err) {
+        // Original message already deleted → stay silent
+        if (isMessageGone(err)) return;
+        // Other edit failures fall back to a reply
       }
     }
   }
 
-  await ctx.reply(fixedText, {
-    reply_parameters: { message_id: ctx.message!.message_id },
-  });
+  try {
+    await ctx.reply(fixedText, {
+      reply_parameters: { message_id: ctx.message!.message_id },
+    });
+  } catch (err) {
+    if (!isMessageGone(err)) throw err;
+  }
 }
 
 /**
@@ -154,26 +194,34 @@ export async function handlePlatformUrl(ctx: Context): Promise<void> {
   // Use the first matched URL
   const { url, key } = matchedUrls[0];
 
-  // Send a "processing" message
-  const statusMsg = await ctx.reply(`⏳ 正在处理 ${platformNameMap[key] || key} 链接...`, {
-    reply_parameters: { message_id: ctx.message!.message_id },
-  });
+  // Groups get no progress message (less noise / anti-spam impact)
+  let statusMsgId: number | undefined;
+  if (!isGroupChat(ctx)) {
+    const statusMsg = await ctx.reply(
+      `⏳ 正在处理 ${platformNameMap[key] || key} 链接...`,
+      { reply_parameters: { message_id: ctx.message!.message_id } }
+    );
+    statusMsgId = statusMsg.message_id;
+  }
 
   try {
     if (key === 'wechat') {
-      await handleWechatUrl(ctx, url, statusMsg.message_id);
+      // WeChat articles are not SNS previews; skip in groups
+      if (isGroupChat(ctx)) return;
+      await handleWechatUrl(ctx, url, statusMsgId);
     } else if (key === 'facebook') {
-      await handleFacebookMediaUrl(ctx, url, statusMsg.message_id);
+      await handleFacebookMediaUrl(ctx, url, statusMsgId);
     } else {
-      await handleMediaUrl(ctx, url, key, statusMsg.message_id);
+      await handleMediaUrl(ctx, url, key, statusMsgId);
     }
   } catch (err) {
+    // Don't post error messages in groups
+    if (statusMsgId === undefined) {
+      console.error('URL handling failed:', err);
+      return;
+    }
     const errorText = err instanceof Error ? err.message : '未知错误';
-    await ctx.api.editMessageText(
-      ctx.chat!.id,
-      statusMsg.message_id,
-      `❌ 处理失败：${errorText}`
-    );
+    await editStatus(ctx, statusMsgId, `❌ 处理失败：${errorText}`);
   }
 }
 
@@ -185,7 +233,7 @@ export async function handlePlatformUrl(ctx: Context): Promise<void> {
 async function handleFacebookMediaUrl(
   ctx: Context,
   url: string,
-  statusMsgId: number
+  statusMsgId: number | undefined
 ): Promise<void> {
   try {
     await handleMediaUrl(ctx, url, 'facebook', statusMsgId);
@@ -196,10 +244,14 @@ async function handleFacebookMediaUrl(
     if (!fixed || fixed === url) throw err;
 
     // Remove the status message and reply with the embed link instead
-    await ctx.api.deleteMessage(ctx.chat!.id, statusMsgId).catch(() => {});
-    await ctx.reply(fixed, {
-      reply_parameters: { message_id: ctx.message!.message_id },
-    });
+    await deleteStatus(ctx, statusMsgId);
+    try {
+      await ctx.reply(fixed, {
+        reply_parameters: { message_id: ctx.message!.message_id },
+      });
+    } catch (e) {
+      if (!isMessageGone(e)) throw e;
+    }
   }
 }
 
@@ -209,10 +261,10 @@ async function handleFacebookMediaUrl(
 async function handleWechatUrl(
   ctx: Context,
   url: string,
-  statusMsgId: number
+  statusMsgId: number | undefined
 ): Promise<void> {
-  await ctx.api.editMessageText(
-    ctx.chat!.id,
+  await editStatus(
+    ctx,
     statusMsgId,
     '⏳ 正在抓取微信文章并上传到 Telegraph...'
   );
@@ -220,19 +272,33 @@ async function handleWechatUrl(
   const mod = await import('../modules/wechat.js');
   const result = await mod.processWechatArticle(url);
 
+  if (statusMsgId !== undefined) {
+    if (result.success) {
+      await editStatus(
+        ctx,
+        statusMsgId,
+        `📄 <b>${escapeHtml(result.title)}</b>\n\n🔗 <a href="${result.telegraphUrl}">在 Telegraph 上阅读</a>`,
+        { parse_mode: 'HTML' }
+      );
+    } else {
+      await editStatus(ctx, statusMsgId, `❌ ${result.error}`);
+    }
+    return;
+  }
+
+  // No status message (groups): only post on success
   if (result.success) {
-    await ctx.api.editMessageText(
-      ctx.chat!.id,
-      statusMsgId,
-      `📄 <b>${escapeHtml(result.title)}</b>\n\n🔗 <a href="${result.telegraphUrl}">在 Telegraph 上阅读</a>`,
-      { parse_mode: 'HTML' }
-    );
-  } else {
-    await ctx.api.editMessageText(
-      ctx.chat!.id,
-      statusMsgId,
-      `❌ ${result.error}`
-    );
+    try {
+      await ctx.reply(
+        `📄 <b>${escapeHtml(result.title)}</b>\n\n🔗 <a href="${result.telegraphUrl}">在 Telegraph 上阅读</a>`,
+        {
+          reply_parameters: { message_id: ctx.message!.message_id },
+          parse_mode: 'HTML',
+        }
+      );
+    } catch (e) {
+      if (!isMessageGone(e)) throw e;
+    }
   }
 }
 
@@ -243,10 +309,10 @@ async function handleMediaUrl(
   ctx: Context,
   url: string,
   key: string,
-  statusMsgId: number
+  statusMsgId: number | undefined
 ): Promise<void> {
-  await ctx.api.editMessageText(
-    ctx.chat!.id,
+  await editStatus(
+    ctx,
     statusMsgId,
     `⏳ 正在下载 ${platformNameMap[key] || key} 内容...`
   );
@@ -271,8 +337,8 @@ async function handleMediaUrl(
   }
 
   // Check file sizes before downloading
-  await ctx.api.editMessageText(
-    ctx.chat!.id,
+  await editStatus(
+    ctx,
     statusMsgId,
     `⏳ 正在下载 ${result.items.length} 个文件并发送...`
   );
@@ -302,8 +368,8 @@ async function handleMediaUrl(
       // Check size limit (50MB for bot)
       if (buffer.length > TG_BOT_MAX_FILE_SIZE) {
         // Still download others, but skip this one
-        await ctx.api.editMessageText(
-          ctx.chat!.id,
+        await editStatus(
+          ctx,
           statusMsgId,
           `⚠️ 文件 ${i + 1} 超过 50MB 限制，已跳过`
         );
@@ -320,7 +386,7 @@ async function handleMediaUrl(
   }
 
   // Delete the status message before sending media
-  await ctx.api.deleteMessage(ctx.chat!.id, statusMsgId).catch(() => {});
+  await deleteStatus(ctx, statusMsgId);
 
   try {
     await sendDownloadedMedia(ctx, downloadedItems);
@@ -386,6 +452,8 @@ async function sendDownloadedMedia(
       try {
         await sendSingleMedia(ctx, item, localPath, replyTo);
       } catch (err) {
+        // Original message deleted → stay silent
+        if (isMessageGone(err)) return;
         console.error(`Failed to send ${localPath}:`, err);
       }
       continue;
@@ -413,11 +481,15 @@ async function sendDownloadedMedia(
         reply_parameters: { message_id: replyTo },
       });
     } catch (err) {
+      // Original message deleted → stay silent
+      if (isMessageGone(err)) return;
+
       console.error('Failed to send media group, falling back:', err);
       for (const { item, localPath } of chunk) {
         try {
           await sendSingleMedia(ctx, item, localPath, replyTo);
         } catch (e) {
+          if (isMessageGone(e)) return;
           console.error(`Failed to send ${localPath}:`, e);
         }
       }
