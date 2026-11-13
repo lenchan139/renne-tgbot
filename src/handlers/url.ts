@@ -13,6 +13,7 @@ import {
 } from '../modules/downloader.js';
 import fs from 'fs';
 import path from 'path';
+import { watchForOriginalDeletion } from '../utils/messageWatch.js';
 
 // ─── Shared helpers ──────────────────────────────────────────
 
@@ -82,9 +83,14 @@ async function sendFixedUrl(
   }
 
   try {
-    await ctx.reply(fixedText, {
+    const sent = await ctx.reply(fixedText, {
       reply_parameters: { message_id: ctx.message!.message_id },
     });
+    if (isGroupChat(ctx)) {
+      watchForOriginalDeletion(ctx.api, ctx.chat!.id, ctx.message!.message_id, [
+        sent.message_id,
+      ]);
+    }
   } catch (err) {
     if (!isMessageGone(err)) throw err;
   }
@@ -246,9 +252,14 @@ async function handleFacebookMediaUrl(
     // Remove the status message and reply with the embed link instead
     await deleteStatus(ctx, statusMsgId);
     try {
-      await ctx.reply(fixed, {
+      const sent = await ctx.reply(fixed, {
         reply_parameters: { message_id: ctx.message!.message_id },
       });
+      if (isGroupChat(ctx)) {
+        watchForOriginalDeletion(ctx.api, ctx.chat!.id, ctx.message!.message_id, [
+          sent.message_id,
+        ]);
+      }
     } catch (e) {
       if (!isMessageGone(e)) throw e;
     }
@@ -389,7 +400,17 @@ async function handleMediaUrl(
   await deleteStatus(ctx, statusMsgId);
 
   try {
-    await sendDownloadedMedia(ctx, downloadedItems);
+    const sentIds = await sendDownloadedMedia(ctx, downloadedItems);
+
+    // Groups: if the original post gets removed later, also remove our media
+    if (isGroupChat(ctx) && sentIds.length > 0) {
+      watchForOriginalDeletion(
+        ctx.api,
+        ctx.chat!.id,
+        ctx.message!.message_id,
+        sentIds
+      );
+    }
   } finally {
     // Clean up all files after sending
     for (const { localPath } of downloadedItems) {
@@ -413,23 +434,23 @@ async function sendSingleMedia(
   item: MediaItem,
   localPath: string,
   replyTo: number
-): Promise<void> {
+): Promise<number> {
   const file = new InputFile(localPath);
 
-  if (isVideoLike(item)) {
-    await ctx.replyWithVideo(file, {
-      reply_parameters: { message_id: replyTo },
-      width: item.width,
-      height: item.height,
-      duration: item.duration,
-      caption: item.caption,
-    });
-  } else {
-    await ctx.replyWithPhoto(file, {
-      reply_parameters: { message_id: replyTo },
-      caption: item.caption,
-    });
-  }
+  const sent = isVideoLike(item)
+    ? await ctx.replyWithVideo(file, {
+        reply_parameters: { message_id: replyTo },
+        width: item.width,
+        height: item.height,
+        duration: item.duration,
+        caption: item.caption,
+      })
+    : await ctx.replyWithPhoto(file, {
+        reply_parameters: { message_id: replyTo },
+        caption: item.caption,
+      });
+
+  return sent.message_id;
 }
 
 /**
@@ -440,8 +461,9 @@ async function sendSingleMedia(
 async function sendDownloadedMedia(
   ctx: Context,
   items: { item: MediaItem; localPath: string }[]
-): Promise<void> {
+): Promise<number[]> {
   const replyTo = ctx.message!.message_id;
+  const sentIds: number[] = [];
 
   for (let start = 0; start < items.length; start += MAX_MEDIA_PER_GROUP) {
     const chunk = items.slice(start, start + MAX_MEDIA_PER_GROUP);
@@ -450,10 +472,10 @@ async function sendDownloadedMedia(
     if (chunk.length === 1) {
       const { item, localPath } = chunk[0];
       try {
-        await sendSingleMedia(ctx, item, localPath, replyTo);
+        sentIds.push(await sendSingleMedia(ctx, item, localPath, replyTo));
       } catch (err) {
         // Original message deleted → stay silent
-        if (isMessageGone(err)) return;
+        if (isMessageGone(err)) return sentIds;
         console.error(`Failed to send ${localPath}:`, err);
       }
       continue;
@@ -477,24 +499,27 @@ async function sendDownloadedMedia(
         return InputMediaBuilder.photo(new InputFile(localPath), { caption });
       });
 
-      await ctx.replyWithMediaGroup(media, {
+      const sent = await ctx.replyWithMediaGroup(media, {
         reply_parameters: { message_id: replyTo },
       });
+      sentIds.push(...sent.map((m) => m.message_id));
     } catch (err) {
       // Original message deleted → stay silent
-      if (isMessageGone(err)) return;
+      if (isMessageGone(err)) return sentIds;
 
       console.error('Failed to send media group, falling back:', err);
       for (const { item, localPath } of chunk) {
         try {
-          await sendSingleMedia(ctx, item, localPath, replyTo);
+          sentIds.push(await sendSingleMedia(ctx, item, localPath, replyTo));
         } catch (e) {
-          if (isMessageGone(e)) return;
+          if (isMessageGone(e)) return sentIds;
           console.error(`Failed to send ${localPath}:`, e);
         }
       }
     }
   }
+
+  return sentIds;
 }
 
 // ─── Helpers ──────────────────────────────────────────────────
