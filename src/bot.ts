@@ -28,6 +28,40 @@ const X_URL_RE = /\b(x\.com|twitter\.com)\b/i;
 const PLATFORM_URL_RE =
   /(threads\.net|xhslink\.com|xiaohongshu\.com|v\.douyin\.com|douyin\.com|vt\.tiktok\.com|tiktok\.com|vm\.tiktok\.com|weibo\.com|m\.weibo\.cn|weibo\.cn|bilibili\.com|b23\.tv|facebook\.com|fb\.watch|fb\.com|facebed\.com|mp\.weixin\.qq\.com)/i;
 
+/**
+ * Whether a group message is explicitly directed at this bot:
+ * either it @mentions the bot, or it replies to a bot message.
+ */
+function isDirectedAtBot(ctx: Context): boolean {
+  const msg = ctx.message;
+  if (!msg) return false;
+
+  // Reply to one of this bot's messages
+  const replied = msg.reply_to_message;
+  if (replied?.from?.id === ctx.me.id) return true;
+
+  // @mention of the bot's username
+  const username = ctx.me.username;
+  if (!username) return false;
+
+  const mention = `@${username}`.toLowerCase();
+  const entities = msg.entities ?? msg.caption_entities ?? [];
+  const source = msg.text ?? msg.caption ?? '';
+
+  for (const ent of entities) {
+    if (ent.type === 'mention') {
+      const raw = source.slice(ent.offset, ent.offset + ent.length);
+      if (raw.toLowerCase() === mention) return true;
+    }
+    if (ent.type === 'text_mention' && ent.user?.id === ctx.me.id) {
+      return true;
+    }
+  }
+
+  // Fallback for clients that don't expose entities
+  return source.toLowerCase().includes(mention);
+}
+
 // ─── Command handlers ───────────────────────────────────────
 
 bot.command('start', startCommand);
@@ -41,10 +75,12 @@ bot.on('message', async (ctx) => {
   const text = msg.text || '';
   const isGroup = ctx.chat?.type === 'group' || ctx.chat?.type === 'supergroup';
 
-  // ─── Groups: only auto-handle SNS links / previews ───────────
-  // Torrents, images, videos and GIFs are ignored in groups.
+  // ─── Groups: only react when @mentioned or replied to ────────
+  // Otherwise ignore (no torrents, images, videos, GIFs or bare links).
   // (Commands such as /bt still work via the handlers above.)
   if (isGroup) {
+    if (!isDirectedAtBot(ctx)) return;
+
     if (text && X_URL_RE.test(text)) {
       return handleXUrl(ctx);
     }
